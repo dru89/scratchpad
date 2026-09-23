@@ -8,6 +8,7 @@
 set -uo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 variants=("$@")
+mkdir -p "$here/results"
 [[ ${#variants[@]} -eq 0 ]] && variants=(tauri-default tauri-nodmabuf tauri-nocompositing tauri-x11 electron-wayland electron-x11)
 
 for v in "${variants[@]}"; do
