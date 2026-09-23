@@ -1,0 +1,30 @@
+{
+  "name": "scratchpad-shell-test",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fixture": "node fixtures/gen.mjs",
+    "typecheck": "tsc --noEmit",
+    "build:editor": "vite build",
+    "build:tauri": "tauri build --no-bundle",
+    "build": "npm run fixture && npm run build:editor && npm run build:tauri",
+    "summarize": "node scripts/summarize.mjs"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.13",
+    "@lezer/highlight": "^1.2.3",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.3",
+    "marked": "^18.0.14"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.5",
+    "electron": "^44.4.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}
