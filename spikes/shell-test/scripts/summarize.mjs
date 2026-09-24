@@ -12,55 +12,48 @@ for (const f of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
   latest.set(r.info.variant, r);
 }
 
-const f1 = (x) => (x == null ? '–' : Number(x).toFixed(1));
 const f0 = (x) => (x == null ? '–' : Number(x).toFixed(0));
-const pct = (s) => (s?.dropped == null ? '–' : `${((100 * s.dropped) / s.n).toFixed(1)}%`);
+const f1 = (x) => (x == null ? '–' : Number(x).toFixed(1));
+const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+const fps = (s) => (s ? f0(1000 / s.mean) : '–');
+
+// Older results counted mem.py itself; leave it out either way.
+const pss = (m) => m && m.processes.filter((p) => p.comm !== 'python3').reduce((a, p) => a + (p.pssKb ?? 0), 0) / 1024;
 
 const rows = [...latest.values()].map((r) => {
-  const t = r.typing ?? {};
-  const avg = (k) => {
-    const xs = Object.values(t).map((x) => x[k].p95);
-    return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
-  };
-  const worstDropped = Object.values(t).reduce((a, x) => a + (x.frame.dropped ?? 0), 0);
-  const typedFrames = Object.values(t).reduce((a, x) => a + x.frame.n, 0);
+  const typing = Object.values(r.typing ?? {});
+  const typingFrames = typing.map((t) => t.frame);
   return [
     r.info.variant,
-    f1(r.refreshMs),
-    f0(r.load?.navToFirstFrameMs),
     f0(r.load?.launchToFirstFrameMs),
-    f1(r.load?.fixtureIpcMs),
-    f1(avg('dispatch')),
-    f1(avg('frame')),
-    typedFrames ? `${((100 * worstDropped) / typedFrames).toFixed(1)}%` : '–',
-    f1(t.table?.frame.p95),
-    f1(r.scroll?.frame.p95),
-    pct(r.scroll?.frame),
+    f0(r.load?.navToFirstFrameMs),
+    f1(mean(typing.map((t) => t.dispatch.p95))),
+    `${f1(mean(typingFrames.map((s) => s.p50)))} / ${f1(mean(typingFrames.map((s) => s.p95)))}`,
+    f0(mean(typingFrames.map((s) => 1000 / s.mean))),
+    `${f1(r.scroll?.frame.p50)} / ${f1(r.scroll?.frame.p95)}`,
+    fps(r.scroll?.frame),
     f0(r.jumps?.p95),
     f0(r.paste?.settledMs),
     f1(r.captureWarm?.ms.p50),
     f0(r.captureCold?.ms.p50),
-    f0(r.memory?.totalPssMb),
+    f0(pss(r.memory)),
   ];
 });
 
 const header = [
   'variant',
-  'refresh ms',
-  'load: nav→frame ms',
-  'load: launch→frame ms',
-  'fixture IPC ms',
-  'typing dispatch p95',
-  'typing frame p95',
-  'typing dropped',
-  'table typing frame p95',
-  'scroll frame p95',
-  'scroll dropped',
-  'jump p95 ms',
-  '100KB paste ms',
-  'capture warm p50 ms',
-  'capture cold p50 ms',
-  'memory PSS MB',
+  'launch → first frame (ms)',
+  'page → first frame (ms)',
+  'keystroke JS p95 (ms)',
+  'typing frame p50 / p95 (ms)',
+  'typing fps',
+  'scroll frame p50 / p95 (ms)',
+  'scroll fps',
+  'jump p95 (ms)',
+  '100KB paste (ms)',
+  'capture warm p50 (ms)',
+  'capture cold p50 (ms)',
+  'memory PSS (MB)',
 ];
 
 const md = [

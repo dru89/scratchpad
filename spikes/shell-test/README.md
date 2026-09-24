@@ -58,6 +58,29 @@ Each shell listens on `$XDG_RUNTIME_DIR/scratchpad-spike.sock`. To test the real
 
 `send.sh` also forwards `XDG_ACTIVATION_TOKEN`; the shell logs whether one arrived.
 
+## Results: 2026-09-23
+
+Display: DP-3, 3840×2160 at 1.45× scale, 240 Hz, so a frame is 4.2ms. Full numbers are in [`results/SUMMARY.md`](results/SUMMARY.md), raw runs in `results/*.json`.
+
+| variant | typing fps | scroll fps | keystroke JS p95 | jump p95 | capture warm / cold | memory PSS |
+| --- | --- | --- | --- | --- | --- | --- |
+| tauri-default | crashed at launch | | | | | |
+| tauri-nodmabuf | 85 | 69 | 6.0ms | 96ms | 10 / 154ms | 419 MB |
+| tauri-nocompositing | 85 | 69 | 6.2ms | 96ms | 19 / 158ms | 432 MB |
+| tauri-x11 | hung, never rendered | | | | | |
+| electron-wayland | 229 | 236 | 3.3ms | 38ms | 15 / 93ms | 582 MB |
+| electron-x11 | 232 | 236 | 3.0ms | 35ms | 8 / 84ms | 521 MB |
+
+**Stock Tauri doesn't run on this machine.** `tauri-default` dies immediately with `Error 71 (Protocol error) dispatching to Wayland display`, which is the NVIDIA DMA-BUF failure in Tauri's own Linux troubleshooting docs. Both workarounds start, but WebKitGTK then tops out around 70–85 fps under load on a 240 Hz panel. `tauri-x11` failed to allocate GBM buffers and never drew a frame.
+
+**Electron holds the display's refresh rate** while typing and scrolling through the 100k-word document, and its JavaScript engine does about half the work per keystroke (3.3 vs 6.0ms at p95). Jumping to a random spot in the document costs 38ms against 96ms.
+
+**Tauri's advantages are smaller than expected.** It uses roughly 150 MB less memory and reaches its first frame sooner after the page starts (110 vs 223ms), but launch-to-first-frame is a wash at about 400ms for both. Capture windows that already exist appear in 10–20ms in either shell. Brand-new windows take 155ms in Tauri, because WebKit spawns a new web process, and about 90ms in Electron.
+
+Two caveats on the raw files. Electron's `gpuFeatures` field says `disabled_software` because it's read before the GPU process finishes starting; a separate probe shows GPU compositing enabled on the NVIDIA card. And the `refreshMs` field is the idle frame interval, which both engines throttle, so ignore it.
+
+**Verdict:** use Electron for the desktop shell unless the manual feel test contradicts these numbers. Revisit when WebKitGTK 2.54 (Skia compositor by default) reaches Arch or Tauri's CEF backend ships. `bridge.ts` keeps the editor independent of the shell, so switching later costs little.
+
 ## Things already learned
 
 - **Run it from a normal terminal.** The Claude Code shell sandbox blocks GPU driver access (`/usr/lib/gbm/dri_gbm.so: Permission denied`), so anything launched from it renders in software.

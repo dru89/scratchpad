@@ -45,6 +45,8 @@ def main():
     pids, stack = [], [root]
     while stack:
         pid = stack.pop()
+        if pid == os.getpid():
+            continue  # don't count this script
         pids.append(pid)
         stack.extend(children.get(pid, []))
 

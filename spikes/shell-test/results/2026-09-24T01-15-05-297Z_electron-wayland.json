@@ -1,0 +1,359 @@
+{
+  "info": {
+    "shell": "electron",
+    "variant": "electron-wayland",
+    "autorun": true,
+    "pid": 140716,
+    "launchMs": 1790212476679,
+    "versions": {
+      "electron": "44.4.4",
+      "chrome": "152.0.7977.130",
+      "v8": "15.2.124.28-electron.0"
+    },
+    "ozonePlatformSwitch": "wayland",
+    "gpu": {
+      "auxAttributes": {
+        "amdSwitchable": false,
+        "canSupportThreadedTextureMailbox": false,
+        "glImplementationParts": "(gl=none,angle=none)",
+        "glResetNotificationStrategy": 0,
+        "hardwareSupportsVulkan": false,
+        "inProcessGpu": true,
+        "initializationTime": 0,
+        "isAsan": false,
+        "isClangCoverage": false,
+        "jpegDecodeAcceleratorSupported": false,
+        "optimus": true,
+        "passthroughCmdDecoder": false,
+        "sandboxed": false,
+        "skiaBackendType": "None",
+        "subpixelFontRendering": true,
+        "targetCpuBits": 64,
+        "visibilityCallbackCallCount": 0
+      },
+      "gpuDevice": [
+        {
+          "active": true,
+          "deviceId": 9988,
+          "gpuPreference": 0,
+          "vendorId": 4318
+        },
+        {
+          "active": false,
+          "deviceId": 42880,
+          "gpuPreference": 0,
+          "vendorId": 32902
+        }
+      ]
+    },
+    "gpuFeatures": {
+      "2d_canvas": "disabled_software",
+      "direct_rendering_display_compositor": "disabled_off_ok",
+      "gpu_compositing": "disabled_software",
+      "multiple_raster_threads": "enabled_on",
+      "opengl": "disabled_off",
+      "rasterization": "disabled_software",
+      "raw_draw": "disabled_off_ok",
+      "skia_graphite": "disabled_off",
+      "trees_in_viz": "disabled_off",
+      "video_decode": "disabled_software",
+      "video_encode": "disabled_software",
+      "vulkan": "disabled_off",
+      "webgl": "disabled_off",
+      "webgpu": "disabled_off",
+      "webgpu_on_vk_via_gl_interop": "disabled_off",
+      "webnn": "disabled_off"
+    }
+  },
+  "load": {
+    "navToScriptMs": 105.5,
+    "fixtureIpcMs": 1,
+    "fixtureChars": 678811,
+    "createViewMs": 25.3,
+    "firstFrameMs": 89.5,
+    "navToFirstFrameMs": 222.9,
+    "launchToFirstFrameMs": 383.9
+  },
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.130 Electron/44.4.4 Safari/537.36",
+  "devicePixelRatio": 1.4500000476837158,
+  "viewport": {
+    "width": 1099,
+    "height": 871
+  },
+  "docChars": 678811,
+  "startedAt": "2026-09-24T01:14:37.303Z",
+  "refreshMs": 16.7,
+  "typing": {
+    "paragraph": {
+      "dispatch": {
+        "n": 200,
+        "mean": 2.74,
+        "p50": 2.3,
+        "p95": 3.4,
+        "p99": 28,
+        "max": 35.9
+      },
+      "frame": {
+        "n": 200,
+        "mean": 4.5,
+        "p50": 4.2,
+        "p95": 4.3,
+        "p99": 29.1,
+        "max": 37.5,
+        "dropped": 2
+      }
+    },
+    "table": {
+      "dispatch": {
+        "n": 200,
+        "mean": 2.72,
+        "p50": 2.5,
+        "p95": 4.4,
+        "p99": 8.3,
+        "max": 12.1
+      },
+      "frame": {
+        "n": 200,
+        "mean": 4.33,
+        "p50": 4.2,
+        "p95": 4.3,
+        "p99": 8.4,
+        "max": 12.5,
+        "dropped": 0
+      }
+    },
+    "heading": {
+      "dispatch": {
+        "n": 200,
+        "mean": 2.68,
+        "p50": 2.6,
+        "p95": 3.2,
+        "p99": 4.5,
+        "max": 7.7
+      },
+      "frame": {
+        "n": 200,
+        "mean": 4.42,
+        "p50": 4.2,
+        "p95": 8.3,
+        "p99": 8.4,
+        "max": 8.4,
+        "dropped": 0
+      }
+    },
+    "start": {
+      "dispatch": {
+        "n": 200,
+        "mean": 2.64,
+        "p50": 3.4,
+        "p95": 3.8,
+        "p99": 4.8,
+        "max": 4.9
+      },
+      "frame": {
+        "n": 200,
+        "mean": 4.29,
+        "p50": 4.2,
+        "p95": 4.3,
+        "p99": 8.5,
+        "max": 12.5,
+        "dropped": 0
+      }
+    },
+    "end": {
+      "dispatch": {
+        "n": 200,
+        "mean": 1.54,
+        "p50": 1.4,
+        "p95": 1.6,
+        "p99": 11.8,
+        "max": 22.8
+      },
+      "frame": {
+        "n": 200,
+        "mean": 4.31,
+        "p50": 4.2,
+        "p95": 4.3,
+        "p99": 16.7,
+        "max": 20.8,
+        "dropped": 0
+      }
+    }
+  },
+  "scroll": {
+    "pxPerSec": 6000,
+    "distancePx": 60002,
+    "frame": {
+      "n": 2362,
+      "mean": 4.23,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "max": 16.7,
+      "dropped": 0
+    }
+  },
+  "jumps": {
+    "n": 20,
+    "mean": 12.56,
+    "p50": 9.9,
+    "p95": 38.4,
+    "p99": 38.4,
+    "max": 38.4
+  },
+  "paste": {
+    "chars": 100000,
+    "dispatchMs": 38.4,
+    "settledMs": 47
+  },
+  "captureWarm": {
+    "runs": [
+      {
+        "label": "capture-warm",
+        "mode": "warm",
+        "ms": 14.7578125,
+        "rttMs": 15.066162109375
+      },
+      {
+        "label": "capture-warm",
+        "mode": "warm",
+        "ms": 21.32958984375,
+        "rttMs": 21.59130859375
+      },
+      {
+        "label": "capture-warm",
+        "mode": "warm",
+        "ms": 9.471435546875,
+        "rttMs": 9.992919921875
+      },
+      {
+        "label": "capture-warm",
+        "mode": "warm",
+        "ms": 29.3564453125,
+        "rttMs": 29.467041015625
+      },
+      {
+        "label": "capture-warm",
+        "mode": "warm",
+        "ms": 8.444091796875,
+        "rttMs": 8.697265625
+      }
+    ],
+    "ms": {
+      "n": 5,
+      "mean": 16.67,
+      "p50": 14.76,
+      "p95": 29.36,
+      "p99": 29.36,
+      "max": 29.36
+    },
+    "rttMs": {
+      "n": 5,
+      "mean": 16.96,
+      "p50": 15.07,
+      "p95": 29.47,
+      "p99": 29.47,
+      "max": 29.47
+    }
+  },
+  "captureCold": {
+    "runs": [
+      {
+        "label": "capture-cold-1",
+        "mode": "cold",
+        "ms": 103.841552734375,
+        "rttMs": 104.04833984375
+      },
+      {
+        "label": "capture-cold-2",
+        "mode": "cold",
+        "ms": 69.042236328125,
+        "rttMs": 69.02001953125
+      },
+      {
+        "label": "capture-cold-3",
+        "mode": "cold",
+        "ms": 93.019287109375,
+        "rttMs": 93.16259765625
+      }
+    ],
+    "ms": {
+      "n": 3,
+      "mean": 88.63,
+      "p50": 93.02,
+      "p95": 103.84,
+      "p99": 103.84,
+      "max": 103.84
+    },
+    "rttMs": {
+      "n": 3,
+      "mean": 88.74,
+      "p50": 93.16,
+      "p95": 104.05,
+      "p99": 104.05,
+      "max": 104.05
+    }
+  },
+  "memory": {
+    "totalPssMb": 587.6,
+    "totalRssMb": 1183,
+    "pssUnreadable": [],
+    "processes": [
+      {
+        "pid": 140716,
+        "comm": "electron",
+        "pssKb": 100655,
+        "rssKb": 218188
+      },
+      {
+        "pid": 140926,
+        "comm": "python3",
+        "pssKb": 5581,
+        "rssKb": 12064
+      },
+      {
+        "pid": 140756,
+        "comm": "electron",
+        "pssKb": 24937,
+        "rssKb": 88488
+      },
+      {
+        "pid": 140722,
+        "comm": "electron",
+        "pssKb": 11892,
+        "rssKb": 69468
+      },
+      {
+        "pid": 140724,
+        "comm": "electron",
+        "pssKb": 3928,
+        "rssKb": 17600
+      },
+      {
+        "pid": 140768,
+        "comm": "electron",
+        "pssKb": 49963,
+        "rssKb": 129164
+      },
+      {
+        "pid": 140760,
+        "comm": "electron",
+        "pssKb": 242933,
+        "rssKb": 327480
+      },
+      {
+        "pid": 140721,
+        "comm": "electron",
+        "pssKb": 14325,
+        "rssKb": 68300
+      },
+      {
+        "pid": 140754,
+        "comm": "electron",
+        "pssKb": 147480,
+        "rssKb": 280632
+      }
+    ]
+  },
+  "finishedAt": "2026-09-24T01:15:05.009Z"
+}
