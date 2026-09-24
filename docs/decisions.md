@@ -2,6 +2,23 @@
 
 Newest first. Each entry says what was decided, why, and what would make us revisit it.
 
+## 2026-09-23: The core runs as its own process
+
+**Decision:** A Rust daemon (`scratchpadd`, working name) owns the SQLite store, the Loro documents, the keys and the sync connection. The Electron app, the CLI, and the MCP server (`scratchpad mcp`, over stdio) are all clients of one local socket protocol. On iOS the same Rust library runs in-process.
+
+**Why:**
+- Agents and the CLI work with the app closed.
+- The same binary runs headless on ds9 as the replica remote agents can reach.
+- There's one API surface, and no napi-rs module to rebuild for every Electron release.
+- There's one writer to the store.
+
+**Costs accepted:**
+- Lifecycle: the app spawns the daemon when it can't connect; systemd and launchd socket activation can come later.
+- A version handshake on every connection, with the app restarting an outdated daemon.
+- Reconnect and keystroke buffering in the app.
+- A second binary to bundle and sign.
+- A long-running process holding decrypted keys.
+
 ## 2026-09-23: Desktop shell is Electron
 
 **Decision:** Build the desktop app (Linux and, for now, macOS) on Electron. The editor stays behind `bridge.ts`-style shell abstraction so this can change later.
@@ -28,6 +45,5 @@ Newest first. Each entry says what was decided, why, and what would make us revi
 
 ## Proposed, not yet decided
 
-- **Core:** Rust (SQLite, Loro CRDT, crypto, sync). With Electron that means either a napi-rs module in the main process, or a separate Rust daemon that owns the store and serves the app, CLI and MCP over a unix socket. The daemon would keep agent access working with the app closed and avoid native-module ABI churn. See [research](research.md#open-questions).
 - **iOS:** SwiftUI shell hosting the same editor in a WKWebView, with a native text view for quick capture (a WKWebView can't raise the keyboard without a tap).
 - **Sync:** Small Rust server storing opaque encrypted records, using Loro's `%ELO` framing. One Loro document per draft, plus a plaintext markdown copy locally as an escape hatch.

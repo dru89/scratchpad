@@ -34,6 +34,6 @@ Design principle this produced: the only decision a user ever makes about a draf
 
 ## Open questions
 
-- **Where the Rust core lives under Electron.** One option is a napi-rs module in the main process: simplest, but native-module rebuilds track Electron's ABI, and agent access needs the app running. The other is a standalone daemon (`scratchpadd`) owning SQLite and Loro, which the app, CLI and MCP all talk to over a unix socket. That gives one writer, and agents work with the app closed. It costs a process to supervise, and on iOS the core has to be in-process anyway.
+- ~~Where the Rust core lives under Electron.~~ Decided: a separate daemon. See [decisions](decisions.md).
 - **The hosted "cloud" option.** Deferred. It brings accounts, billing, a push relay and support.
 - **Long-term macOS shell.** See [decisions](decisions.md).
