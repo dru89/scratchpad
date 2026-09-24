@@ -1,0 +1,39 @@
+# Research notes (September 2026)
+
+Condensed from the initial scoping. Sources are linked where a claim is load-bearing.
+
+## Why build this at all
+
+No existing app covers the requirements in the [README](../README.md). The closest:
+
+- **Obsidian + Self-hosted LiveSync** covers the most on paper (plain files, live-preview tables, pop-out windows, E2EE sync to your own CouchDB). But it's a files-and-folders app, so every note is a filing decision, which is the "too permanent" feeling. Large tables lag in Live Preview, and iOS only syncs while the app is open.
+- **Notesnook** feels the most like Drafts (flat list, first-line titles, archive, trash that auto-clears, fast E2EE sync). But it stores rich text rather than markdown, has no separate windows, hotkey or agent API, and its self-hosted server is an Oct 2025 beta marked not production-ready.
+- **Joplin 3.7** added in-editor rendering, a table editor and a built-in MCP server, but sync polls on a 5-minute minimum.
+- **Drafts** has no Linux or web editor. Its newer TextKit 2 editor is the likely source of the large-document glitches.
+- **Ruled out:** Heynote (no sync or mobile), Bear (Linux only via web beta), UpNote (no E2EE), Simplenote (development ended Mar 2026), Tot, Antinote, iA Writer, Typora (missing platforms).
+
+Design principle this produced: the only decision a user ever makes about a draft is archive or trash.
+
+## Sync
+
+- **Loro** is the best fit: stable Rust core, UTF-16 text APIs that match CodeMirror offsets, JS bindings, and the `%ELO` E2EE protocol extension, where the server indexes plaintext headers and never decrypts ([spec](https://github.com/loro-dev/protocol/blob/main/protocol-e2ee.md)). Caveats: `%ELO` is protocol v0 and unaudited; `loro-swift` is labeled experimental, so write our own UniFFI layer over the crate.
+- Automerge's E2EE work (Keyhive, Subduction) is pre-alpha. secsync has been dormant since 2024. Jazz 2 dropped E2EE by default. Evolu merges last-write-wins per column, which is wrong for text.
+- **E2EE pattern:** the server stores opaque, ordered records and clients do all merging and compaction. Argon2id passphrase wraps an account key, which wraps per-draft keys. Enroll devices Bitwarden-style (public-key handoff or QR). Keep the login credential separate from the encryption key.
+- **Compaction:** only trim history past a version every device has acknowledged, and keep the previous snapshot until a second device has loaded the new one.
+- **iOS freshness:** background refresh and silent push are best-effort (silent push is throttled to a few per hour). Foreground catch-up over a WebSocket is roughly 0.5–1.5s (estimate). We publish our own app, so our server can hold the APNs key directly. A content-free push relay is only needed if other people self-host.
+- **Trash:** purging must leave a tombstone that syncs, or an offline device brings the draft back.
+
+## Platform gotchas
+
+- **Wayland has no always-on-top request.** On KDE, float-on-top works through a one-shot KWin script over D-Bus that sets `keepAbove` by pid and caption (`spikes/shell-test/scripts/kwin-keep-above.sh`, verified). It's KDE-only and not a stable API.
+- **Global hotkey:** the GlobalShortcuts portal works on Plasma, but it has the silent BindShortcuts bug. Prefer a KDE custom shortcut that runs a CLI, which signals the running app over a unix socket. Forward `XDG_ACTIVATION_TOKEN` so KWin focuses the window instead of flashing the taskbar.
+- **Electron hangs before `ready` when no display is connected** (monitor off or asleep), and so does Chrome. Tauri/GTK starts fine. This matters for autostart at login and for anything launched while the screen sleeps.
+- **Rich copy:** Electron's `clipboard.write({ html, text })` offers both types. On iOS, write a `UIPasteboard` item with `public.html` plus plain text.
+- **iOS quick capture:** one `ControlWidget` covers the Action Button, Lock Screen and Control Center. Land in a native `UITextView` that's already first responder.
+- **Testing from Claude's shell:** the Bash sandbox blocks GPU access, so GUI perf tests need the sandbox disabled. Check `qdbus6 org.kde.KWin /KWin org.kde.KWin.supportInformation` for a nonzero screen count first.
+
+## Open questions
+
+- **Where the Rust core lives under Electron.** One option is a napi-rs module in the main process: simplest, but native-module rebuilds track Electron's ABI, and agent access needs the app running. The other is a standalone daemon (`scratchpadd`) owning SQLite and Loro, which the app, CLI and MCP all talk to over a unix socket. That gives one writer, and agents work with the app closed. It costs a process to supervise, and on iOS the core has to be in-process anyway.
+- **The hosted "cloud" option.** Deferred. It brings accounts, billing, a push relay and support.
+- **Long-term macOS shell.** See [decisions](decisions.md).
