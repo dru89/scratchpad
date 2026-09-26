@@ -2,7 +2,7 @@
 //! is SQLite FTS5 with the trigram tokenizer, so any term of three or more
 //! characters matches anywhere inside a word.
 
-use crate::plain;
+use crate::{plain, title};
 
 /// Splits a query into terms: quoted phrases stay whole, everything else
 /// splits on whitespace.
@@ -65,18 +65,33 @@ const WORD_SLACK: usize = 16;
 
 /// Text around the first match of any term, on one line: each line's
 /// markdown stripped the way titles strip it, table rows as their cells,
-/// lines joined with " · ", and ellipses where it was cut.
+/// lines joined with " · ", and ellipses where it was cut. A match outside
+/// the title line comes first, since the title is shown already; the title
+/// is used only when nothing else matches.
 pub fn snippet(body: &str, terms: &[String]) -> Option<String> {
     let lower = body.to_lowercase();
+    let title = title::title_line(body).unwrap_or(0..0);
+    let find = |term: &str, from: usize| lower.get(from..)?.find(&term.to_lowercase()).map(|i| from + i);
+    let first = |skip_title: bool| {
+        terms
+            .iter()
+            .filter_map(|t| {
+                let i = find(t, 0)?;
+                let i = if skip_title && title.contains(&i) { find(t, title.end)? } else { i };
+                Some((i, t))
+            })
+            .min_by_key(|(i, _)| *i)
+    };
+    let (at, term) = first(true).or_else(|| first(false))?;
     // Lowercasing can change byte lengths for some scripts; only trust the
     // position when it maps back onto a char boundary in the original.
-    let (at, term) =
-        terms.iter().filter_map(|t| lower.find(&t.to_lowercase()).map(|i| (i, t))).min_by_key(|(i, _)| *i)?;
     if !body.is_char_boundary(at) {
         return None;
     }
+    // Past the title, the snippet leaves it out of the context too.
+    let floor = if at >= title.end { title.end } else { 0 };
 
-    let mut from = floor_boundary(body, at.saturating_sub(READ_BEFORE));
+    let mut from = floor_boundary(body, at.saturating_sub(READ_BEFORE)).max(floor);
     let first_line = body[..from].rfind('\n').map_or(0, |i| i + 1);
     let first_whole = from - first_line <= LINE_SLACK;
     if first_whole {
@@ -142,7 +157,7 @@ pub fn snippet(body: &str, terms: &[String]) -> Option<String> {
     if s.is_empty() {
         return None;
     }
-    if start > 0 || !body[..from].trim().is_empty() {
+    if start > 0 || !body[floor..from].trim().is_empty() {
         s.insert(0, '…');
     }
     if end < text.len() || !body[to..].trim().is_empty() {
@@ -206,9 +221,24 @@ mod tests {
     fn snippet_strips_markdown_line_by_line() {
         let body =
             "## Sync\n\n| part | owner |\n| --- | --- |\n| **server** | [me](https://x) |\n\n- [ ] needle in a list\n";
-        assert_eq!(snippet(body, &["needle".into()]).unwrap(), "Sync · part, owner · server, me · needle in a list");
+        assert_eq!(snippet(body, &["needle".into()]).unwrap(), "part, owner · server, me · needle in a list");
         let body = "> quoted *needle*\n\n---\n\n1. first\n";
         assert_eq!(snippet(body, &["needle".into()]).unwrap(), "quoted needle · first");
+    }
+
+    #[test]
+    fn snippet_prefers_a_match_outside_the_title() {
+        let body = "# Sync notes\n\nWe need to resync the phone.";
+        assert_eq!(snippet(body, &["sync".into()]).unwrap(), "We need to resync the phone.");
+        assert_eq!(snippet(body, &["sync".into(), "notes".into()]).unwrap(), "We need to resync the phone.");
+        let body = "\n---\n\n# Sync\n\nbody sync here";
+        assert_eq!(snippet(body, &["sync".into()]).unwrap(), "body sync here");
+        // Only the title matches, so it's the snippet.
+        let body = "# Sync notes\n\nnothing else here";
+        assert_eq!(snippet(body, &["sync".into()]).unwrap(), "Sync notes · nothing else here");
+        // Text between the title and the match that's cut off still gets an ellipsis.
+        let body = format!("# Sync\n\n{}resync", "- item\n".repeat(30));
+        assert!(snippet(&body, &["sync".into()]).unwrap().starts_with("…item"));
     }
 
     #[test]
@@ -223,7 +253,7 @@ mod tests {
     #[test]
     fn snippet_keeps_code_as_written() {
         let body = "Setup\n\n```sh\n# install deps\nneedle --fast\n```\n";
-        assert_eq!(snippet(body, &["needle".into()]).unwrap(), "Setup · # install deps · needle --fast");
+        assert_eq!(snippet(body, &["needle".into()]).unwrap(), "# install deps · needle --fast");
         // The fence opens before the part of the text that's read.
         let body = format!("```\n{}# still code, needle\n```", "x = 1\n".repeat(60));
         assert!(snippet(&body, &["needle".into()]).unwrap().ends_with("x = 1 · # still code, needle"));
@@ -240,6 +270,6 @@ mod tests {
     #[test]
     fn snippet_falls_back_to_the_line_when_the_match_was_syntax() {
         let body = "# Links\n\nSee [the docs](https://example.com/guide) first";
-        assert_eq!(snippet(body, &["example.com".into()]).unwrap(), "Links · See the docs first");
+        assert_eq!(snippet(body, &["example.com".into()]).unwrap(), "See the docs first");
     }
 }

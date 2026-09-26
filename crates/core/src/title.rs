@@ -2,6 +2,8 @@
 //! syntax stripped (docs/design.md#drafts). The stripping is in plain.rs,
 //! shared with search snippets.
 
+use std::ops::Range;
+
 use crate::plain::{is_fence, is_rule, is_table_divider, line_text};
 
 const MAX_CHARS: usize = 80;
@@ -9,17 +11,29 @@ const MAX_LINES_SCANNED: usize = 200;
 
 /// Returns the draft's title, or an empty string when the body has no text.
 pub fn title(body: &str) -> String {
-    for line in body.lines().take(MAX_LINES_SCANNED) {
-        let line = line.trim();
+    first_text_line(body).map(|(_, text)| truncate(&text)).unwrap_or_default()
+}
+
+/// The byte range of the line the title comes from, including its newline.
+pub fn title_line(body: &str) -> Option<Range<usize>> {
+    first_text_line(body).map(|(range, _)| range)
+}
+
+fn first_text_line(body: &str) -> Option<(Range<usize>, String)> {
+    let mut end = 0;
+    for raw in body.split_inclusive('\n').take(MAX_LINES_SCANNED) {
+        let start = end;
+        end += raw.len();
+        let line = raw.trim();
         if line.is_empty() || is_fence(line) || is_rule(line) || is_table_divider(line) {
             continue;
         }
         let text = line_text(line, " | ");
         if !text.is_empty() {
-            return truncate(&text);
+            return Some((start..end, text));
         }
     }
-    String::new()
+    None
 }
 
 fn truncate(s: &str) -> String {
@@ -37,7 +51,7 @@ fn truncate(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::title;
+    use super::{title, title_line};
 
     #[test]
     fn strips_headings_and_inline_syntax() {
@@ -64,6 +78,14 @@ mod tests {
         assert_eq!(title("```js\nconst x = 1\n```"), "const x = 1");
         assert_eq!(title("| --- | :-: |\nrow"), "row");
         assert_eq!(title("#\n\nreal"), "real");
+    }
+
+    #[test]
+    fn title_line_is_where_the_title_came_from() {
+        let body = "\n---\n\n# Title\nbody";
+        assert_eq!(&body[title_line(body).unwrap()], "# Title\n");
+        assert_eq!(title_line("only line"), Some(0..9));
+        assert_eq!(title_line("  \n"), None);
     }
 
     #[test]
