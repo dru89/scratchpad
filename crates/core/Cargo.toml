@@ -1,0 +1,20 @@
+[package]
+name = "scratchpad-core"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+base64.workspace = true
+comrak.workspace = true
+directories.workspace = true
+loro.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+ulid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

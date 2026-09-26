@@ -66,19 +66,23 @@ The socket directory is `0700` and the socket `0600`.
 
 ## Storage
 
-The daemon uses one SQLite database:
+The daemon uses one SQLite database (WAL mode):
 
-- `docs`: the id, the latest Loro snapshot, and its version.
-- `doc_updates`: Loro updates since the last snapshot. They're folded into a new snapshot once they pass a size threshold.
+- `docs`: the id and the latest Loro snapshot.
+- `doc_updates`: every Loro update since that snapshot, one row per change, so a keystroke's worth of typing is on disk before its reply goes out. A draft's updates are folded into a new snapshot after 500 of them or 512 KB.
 - `drafts`: the index used for lists, holding id, state, title, createdAt, modifiedAt and trashedAt.
 - `drafts_fts`: an FTS5 table using the trigram tokenizer, over each draft's title and plain text.
 - `tombstones`: id and deletedAt.
 
-`drafts` and `drafts_fts` are derived from `docs`. A schema change there means a migration plus a reindex, never a data conversion. A plain markdown export of every draft is always one command away, as a way out.
+`drafts` and `drafts_fts` are derived from `docs`, and the daemon rebuilds them on startup if the counts disagree. A schema change there means a migration plus a reindex, never a data conversion. A plain markdown export of every draft is always one command away, as a way out.
+
+**Reindexing** happens once a draft's edits pause for 400 ms, or at most 2 s after the first unindexed edit. `drafts.list` flushes anything pending first, so a list or search always reflects edits already acknowledged. When only metadata changed, for example an archive or a `modifiedAt` stamp, the search index is left alone. Rewriting it costs about 45 ms for a 100k-word draft.
+
+Drafts stay loaded in memory while a window has them open, and for 10 minutes after the last use.
 
 ## Protocol
 
-The daemon speaks JSON-RPC 2.0 over the unix socket, one JSON message per line. MCP is also JSON-RPC, and a line-based protocol is easy to poke at with `socat`. Loro updates travel as base64 strings.
+The daemon speaks JSON-RPC 2.0 over the unix socket, one JSON message per line. MCP is also JSON-RPC, and a line-based protocol is easy to poke at with `socat`. Loro updates and versions travel as base64 strings.
 
 Every connection starts with `hello`:
 
@@ -86,26 +90,34 @@ Every connection starts with `hello`:
 {"jsonrpc":"2.0","id":1,"method":"hello","params":{"protocol":1,"client":{"kind":"app","version":"0.1.0"},"capabilities":["ui"]}}
 ```
 
-The daemon answers with its own protocol number and version. A client that sends `capabilities: ["ui"]` is the one the daemon forwards UI commands to.
+The daemon answers with its protocol number, version and pid. A client that sends `capabilities: ["ui"]` is one the daemon forwards UI commands to; the most recent one wins.
+
+Every `id` parameter accepts a full id or any unique prefix of one, case-insensitively.
 
 | method | params | result / notes |
 | --- | --- | --- |
-| `drafts.list` | `state?`, `query?`, `limit?`, `cursor?` | Summaries (id, title, state, modifiedAt, snippet when searching), newest `modifiedAt` first. `query` uses the search index. |
-| `drafts.get` | `id` | `meta` plus the body as plain text. For the CLI and agents. |
-| `drafts.create` | `text?`, `state?` | `{id}` |
-| `drafts.setText` | `id`, `text` | Replaces the body. The daemon diffs old against new and applies only the changed spans, so an agent's edit merges with someone typing in the same draft. |
-| `drafts.append` | `id`, `text` | |
-| `drafts.setState` | `id`, `state` | |
+| `drafts.list` | `states?` (default `["inbox"]`), `query?`, `limit?` (default 100), `cursor?` | Summaries (id, title, state, createdAt, modifiedAt, trashedAt, and a snippet when searching), newest `modifiedAt` first, plus `nextCursor` when there's more. |
+| `drafts.get` | `id` | The summary, the body as plain text, the whole `meta` map, and `version`. |
+| `drafts.create` | `text?`, `state?` | The new draft's summary and `version`. |
+| `drafts.setText` | `id`, `text`, `baseVersion?` | Replaces the body with a minimal diff. With `baseVersion` (from `drafts.get`), the diff is taken against that version and merged, so text written since, by you in the app, say, survives an agent's revision. Without it, the text replaces whatever the draft holds now. |
+| `drafts.append` | `id`, `text`, `ensureNewline?` | With `ensureNewline`, the text starts on a new line if the draft doesn't already end with one. The CLI and MCP tool set it. |
+| `drafts.setState` | `id`, `state` | Doesn't change `modifiedAt`. |
 | `drafts.discard` | `id` | Deletes a draft outright. Refused unless the body is empty. |
-| `drafts.render` | `id` or `text`, `format: "html"` | Markdown rendered by comrak with GitHub-style tables, for rich copy. |
+| `drafts.render` | `id` or `text` | `{html}`: GitHub-flavored HTML with raw HTML dropped, for rich copy. |
 | `drafts.subscribe` / `unsubscribe` | | Notifications: `drafts.changed {summary}`, `drafts.removed {id}`. |
-| `doc.open` | `id`, `version?` | A snapshot, or the updates since `version`, plus the current version. Starts `doc.update` notifications for that draft. The reply is sent before releasing the draft's lock, so no update for that draft reaches the client ahead of it. |
-| `doc.push` | `id`, `update` | Applies a Loro update from an editor window. |
-| `doc.close` | `id` | |
-| `ui.capture` | `mode?: "summon" \| "new"`, `draftId?` | Forwarded to the `ui` client. If no app is connected, the daemon launches it with the same arguments. |
+| `doc.open` | `id`, `version?` (a version vector) | A snapshot, or the updates since `version`, plus the daemon's version vector. Starts `doc.update {id, update}` notifications for that draft. One task handles every request in order, so the reply always reaches the client before any update for that draft. |
+| `doc.push` | `id`, `update` | Applies a Loro update from an editor window and relays it to the draft's other windows. Updates the daemon already has are ignored. |
+| `doc.close` | `id` | Stops updates. A deleted draft's windows get `doc.removed {id}`. |
+| `ui.capture` | `mode?: "summon" \| "new"`, `draftId?`, `activationToken?` | Forwarded to the app. Until the app exists this fails with "the app isn't running"; later the daemon will launch it. |
 | `ui.open` | `id` | Opens the draft in its own window. |
+| `daemon.status` | | Version, pid, uptime, counts of clients, loaded drafts and drafts. |
+| `daemon.shutdown` | | Replies, then exits. |
 
-MCP tools map onto these: `list_drafts`, `search_drafts`, `get_draft`, `create_draft`, `update_draft`, `append_to_draft`, `archive_draft`, `trash_draft`, `restore_draft`. No tool deletes permanently.
+Errors use JSON-RPC codes plus `-32001` no such draft, `-32002` ambiguous id (with `data.candidates`), `-32003` discard refused because the draft isn't empty, and `-32004` no app connected.
+
+**CLI.** `scratchpad` covers `list`, `search`, `show`, `new`, `append`, `set`, `edit`, `archive`, `trash`, `restore`, `render`, `capture`, `open` and `daemon start|status|stop`, with `--json` on everything. `edit` opens `$VISUAL`/`$EDITOR` and writes back with `baseVersion`, so typing done in the app while the editor was open is kept.
+
+**MCP.** `scratchpad mcp` offers `list_drafts`, `search_drafts`, `get_draft`, `create_draft`, `update_draft`, `append_to_draft`, `archive_draft`, `trash_draft` and `restore_draft`. `get_draft` returns the version and its instructions tell agents to pass it to `update_draft`. No tool deletes permanently.
 
 ## Editor windows
 

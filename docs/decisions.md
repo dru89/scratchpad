@@ -2,6 +2,14 @@
 
 Newest first. Each entry says what was decided, why, and what would make us revisit it.
 
+## 2026-09-26: Agent edits merge from the version they read
+
+**Decision:** `drafts.get` returns a version, and `drafts.setText` accepts it as `baseVersion`. The daemon forks the draft at that version, applies the new text there as a diff, and merges the result back. `scratchpad edit` and the MCP `update_draft` tool both use it.
+
+**Why:** An agent reads a draft, thinks for a while, then writes back its revision. Diffing that revision against the draft's current text treats everything typed in the meantime as something the agent deleted, so it silently disappears. Branching from what the agent actually read makes its edit behave like one from another device, which the CRDT already merges. The daemon's tests caught this before any real agent did.
+
+**Cost:** about 11 ms per `setText` on a 100k-word draft, against 5 ms without a base. Without `baseVersion`, `setText` still means "replace whatever is there now," for scripts that want that.
+
 ## 2026-09-25: Capture window text is a regular draft from the first keystroke
 
 **Decision:** The capture window shows an ordinary draft, created on the first keystroke and saved and synced from then on. A draft that's still empty when its window closes is deleted outright. "Done" (Ctrl/Cmd+Enter) keeps the draft and clears the window. The idle rule and pinning apply to the capture window independently of the main window. Details are in [design.md](design.md#windows).
