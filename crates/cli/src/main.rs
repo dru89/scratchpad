@@ -272,6 +272,9 @@ async fn edit(c: &mut Client, id: &str, json: bool) -> Result<()> {
     }
     let v: Value =
         c.call("drafts.setText", json!({ "id": d.summary.id, "text": edited, "baseVersion": d.version })).await?;
+    if v["merged"] == true && !json {
+        eprintln!("Merged with changes made while you were editing.");
+    }
     print_summary(json, &v)
 }
 

@@ -108,6 +108,16 @@ pub struct ListResult {
     pub next_cursor: Option<String>,
 }
 
+/// drafts.get. With `knownVersion`, an unchanged draft comes back as
+/// `{unchanged: true, version, ...summary}` without its text.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetParams {
+    pub id: String,
+    #[serde(default)]
+    pub known_version: Option<String>,
+}
+
 /// Any method that addresses one draft. `id` may be a unique prefix.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

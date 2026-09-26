@@ -15,6 +15,8 @@ use tokio::net::UnixListener;
 async fn main() -> Result<()> {
     let paths = Paths::resolve()?;
     std::fs::create_dir_all(&paths.data_dir).with_context(|| format!("creating {}", paths.data_dir.display()))?;
+    // Drafts are private: keep other local accounts out of the store.
+    std::fs::set_permissions(&paths.data_dir, std::fs::Permissions::from_mode(0o700))?;
 
     // Held for the life of the process. A second daemon (two clients racing
     // to start one) finds it taken and exits quietly.

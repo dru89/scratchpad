@@ -49,6 +49,20 @@ impl OpenDoc {
     }
 }
 
+/// Frontiers name the same version regardless of the order of their ids.
+fn same_version(a: &Frontiers, b: &Frontiers) -> bool {
+    let mut a: Vec<_> = a.iter().collect();
+    let mut b: Vec<_> = b.iter().collect();
+    a.sort();
+    b.sort();
+    a == b
+}
+
+fn decode_version(v: &str, name: &str) -> Result<Frontiers, RpcError> {
+    let bytes = B64.decode(v).map_err(|e| RpcError::invalid_params(format!("bad {name}: {e}")))?;
+    Frontiers::decode(&bytes).map_err(|e| RpcError::invalid_params(format!("bad {name}: {e}")))
+}
+
 fn hash_text(text: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -202,9 +216,15 @@ impl Daemon {
                 let proto::SetTextParams { id, text, base_version } = params(p)?;
                 match base_version {
                     Some(base) => self.set_text_from(&id, &base, &text),
-                    None => self.agent_edit(&id, |doc| {
-                        draft::body(doc).update(&text, UpdateOptions::default()).map_err(|e| internal(format!("{e:?}")))
-                    }),
+                    None => {
+                        let mut v = self.agent_edit(&id, |doc| {
+                            draft::body(doc)
+                                .update(&text, UpdateOptions::default())
+                                .map_err(|e| internal(format!("{e:?}")))
+                        })?;
+                        v["merged"] = json!(false);
+                        Ok(v)
+                    }
                 }
             }
             "drafts.append" => {
@@ -318,9 +338,16 @@ impl Daemon {
         Ok(serde_json::to_value(proto::ListResult { drafts, next_cursor }).unwrap())
     }
 
-    fn get(&mut self, p: proto::IdParams) -> Result<Value, RpcError> {
+    fn get(&mut self, p: proto::GetParams) -> Result<Value, RpcError> {
         let id = self.resolve(&p.id)?;
+        let known = p.known_version.as_deref().map(|v| decode_version(v, "knownVersion")).transpose()?;
         let open = self.load(&id)?;
+        if known.is_some_and(|k| same_version(&k, &open.doc.oplog_frontiers())) {
+            let mut v = serde_json::to_value(summary_from_doc(&id, &open.doc)).unwrap();
+            v["unchanged"] = json!(true);
+            v["version"] = json!(B64.encode(open.doc.oplog_frontiers().encode()));
+            return Ok(v);
+        }
         let detail = DraftDetail {
             summary: summary_from_doc(&id, &open.doc),
             text: draft::body(&open.doc).to_string(),
@@ -350,13 +377,14 @@ impl Daemon {
 
     /// setText against the version the caller read: the diff is computed on
     /// a fork at that version, then merged, so text written since is kept.
+    /// The result's `merged` says whether anything else had been written
+    /// since, in which case the caller's copy of the text is out of date.
     fn set_text_from(&mut self, raw: &str, base: &str, text: &str) -> Result<Value, RpcError> {
         let id = self.resolve(raw)?;
         let now = self.now();
-        let bytes = B64.decode(base).map_err(|e| RpcError::invalid_params(format!("bad baseVersion: {e}")))?;
-        let frontiers =
-            Frontiers::decode(&bytes).map_err(|e| RpcError::invalid_params(format!("bad baseVersion: {e}")))?;
+        let frontiers = decode_version(base, "baseVersion")?;
         let open = self.load(&id)?;
+        let merged = !same_version(&frontiers, &open.doc.oplog_frontiers());
         let fork = open
             .doc
             .fork_at(&frontiers)
@@ -370,7 +398,9 @@ impl Daemon {
         let update = fork.export(ExportMode::updates(&base_vv)).map_err(internal)?;
         open.doc.import(&update).map_err(internal)?;
         self.record_change(&id, &update, None)?;
-        self.summary_value(&id)
+        let mut v = self.summary_value(&id)?;
+        v["merged"] = json!(merged);
+        Ok(v)
     }
 
     /// Applies an edit as the daemon's own peer (the CLI or an agent), then
@@ -678,12 +708,47 @@ mod tests {
         // its revision of what it read.
         let base = h.ok(&mut agent, "drafts.get", json!({ "id": id }))["version"].clone();
         push(&mut h, &mut win, &id, &doc, |d| draft::body(d).insert(16, " delta").unwrap());
-        h.ok(&mut agent, "drafts.setText", json!({ "id": id, "text": "alpha BETA gamma", "baseVersion": base }));
+        let r =
+            h.ok(&mut agent, "drafts.setText", json!({ "id": id, "text": "alpha BETA gamma", "baseVersion": base }));
+        assert_eq!(r["merged"], true, "the window's typing was merged in");
         apply_updates(&doc, &drain(&mut win));
 
         let daemon_text = h.ok(&mut agent, "drafts.get", json!({ "id": id }))["text"].clone();
         assert_eq!(daemon_text, "alpha BETA gamma delta");
         assert_eq!(draft::body(&doc).to_string(), "alpha BETA gamma delta");
+    }
+
+    #[test]
+    fn an_uncontested_edit_reports_no_merge_and_can_be_chained() {
+        let mut h = Harness::new();
+        let mut agent = h.client();
+        let id = h.ok(&mut agent, "drafts.create", json!({ "text": "one" }))["id"].as_str().unwrap().to_string();
+        let base = h.ok(&mut agent, "drafts.get", json!({ "id": id }))["version"].clone();
+        let r = h.ok(&mut agent, "drafts.setText", json!({ "id": id, "text": "one two", "baseVersion": base }));
+        assert_eq!(r["merged"], false);
+        // Nothing else happened, so the returned version goes with the text we sent.
+        let r = h.ok(
+            &mut agent,
+            "drafts.setText",
+            json!({ "id": id, "text": "one two three", "baseVersion": r["version"] }),
+        );
+        assert_eq!(r["merged"], false);
+        assert_eq!(h.ok(&mut agent, "drafts.get", json!({ "id": id }))["text"], "one two three");
+    }
+
+    #[test]
+    fn get_with_a_known_version_skips_the_text_when_unchanged() {
+        let mut h = Harness::new();
+        let mut c = h.client();
+        let id = h.ok(&mut c, "drafts.create", json!({ "text": "stable" }))["id"].as_str().unwrap().to_string();
+        let v = h.ok(&mut c, "drafts.get", json!({ "id": id }))["version"].clone();
+        let same = h.ok(&mut c, "drafts.get", json!({ "id": id, "knownVersion": v }));
+        assert_eq!(same["unchanged"], true);
+        assert!(same.get("text").is_none());
+        h.ok(&mut c, "drafts.append", json!({ "id": id, "text": "!" }));
+        let changed = h.ok(&mut c, "drafts.get", json!({ "id": id, "knownVersion": v }));
+        assert!(changed.get("unchanged").is_none());
+        assert_eq!(changed["text"], "stable!");
     }
 
     #[test]

@@ -230,11 +230,25 @@ fn mcp_tools_work_end_to_end() {
     let meta: Value = serde_json::from_str(read["content"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(read["content"][1]["text"], "# Agent notes\n\nfirst line");
     env.ok(&["append", &id, "\nuser typed this"]);
-    mcp.tool_json(
+    let updated = mcp.tool_json(
         "update_draft",
         json!({ "id": id, "text": "# Agent notes\n\nFIRST LINE", "base_version": meta["version"] }),
     );
+    assert_eq!(updated["merged"], true, "the user's append was merged in");
     assert_eq!(env.ok(&["show", &id]), "# Agent notes\n\nFIRST LINE\nuser typed this\n");
+
+    // Checking for changes is cheap when nothing has changed.
+    let fresh = mcp.tool("get_draft", json!({ "id": id }));
+    let fresh_meta: Value = serde_json::from_str(fresh["content"][0]["text"].as_str().unwrap()).unwrap();
+    let same = mcp.tool_json("get_draft", json!({ "id": id, "known_version": fresh_meta["version"] }));
+    assert_eq!(same["unchanged"], true);
+
+    // An uncontested edit isn't merged, and its version can be chained.
+    let next = mcp.tool_json(
+        "update_draft",
+        json!({ "id": id, "text": "# Agent notes\n\nFIRST LINE\nuser typed this\n\nagent line", "base_version": fresh_meta["version"] }),
+    );
+    assert_eq!(next["merged"], false);
 
     let hits = mcp.tool_json("search_drafts", json!({ "query": "user typed" }));
     assert_eq!(hits[0]["id"], id.as_str());

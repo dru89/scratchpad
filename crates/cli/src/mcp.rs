@@ -16,9 +16,24 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-const INSTRUCTIONS: &str = "Drafts are markdown notes from the user's scratchpad app: a place where text starts before it goes somewhere else. \
-Ids can be shortened to any unique prefix. Before editing, read the draft with get_draft and pass its version to update_draft as \
-base_version, so your edit merges with anything the user types in the meantime instead of overwriting it. Nothing here deletes \
+const INSTRUCTIONS: &str = "\
+Drafts are markdown notes from the user's scratchpad app, where text starts before it goes somewhere else.
+
+You are one of several editors. The user may be typing in the app, on this device or another, and other agents may be \
+editing too. Every change, yours included, is merged into the draft, so its text afterward can differ from what you sent.
+
+To edit a draft:
+1. Read it with get_draft, and keep its version together with its text.
+2. Send your complete revised text to update_draft with that version as base_version. Your change is merged with anything \
+written since you read the draft instead of overwriting it.
+3. Check merged in the result. If it's false, the draft is now exactly your text, and the returned version goes with it, so \
+you can edit again from there. If it's true, other edits were combined with yours: read the draft again before your next \
+edit, because your copy is out of date.
+4. If time has passed since you read a draft, call get_draft with known_version. It returns unchanged, without the text, \
+when nobody has edited it.
+
+Never pair a version with text you didn't read at that version; the merge would treat the difference as your deletions. \
+append_to_draft adds to the end and needs no version. Ids can be shortened to any unique prefix. Nothing here deletes \
 permanently: trash_draft moves a draft to the Trash, which empties after 30 days.";
 
 #[derive(Clone)]
@@ -52,6 +67,14 @@ pub struct IdArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+pub struct GetArgs {
+    /// Draft id, or any unique prefix of it.
+    pub id: String,
+    /// A version you already have. If the draft hasn't changed since, the result is marked unchanged and leaves out the text.
+    pub known_version: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
 pub struct CreateArgs {
     /// Markdown text. The first line becomes the title.
     pub text: String,
@@ -62,8 +85,9 @@ pub struct UpdateArgs {
     pub id: String,
     /// The complete new markdown text of the draft.
     pub text: String,
-    /// The version from get_draft. With it, your change merges with edits made since you read the draft; without it, your
-    /// text replaces whatever the draft holds now.
+    /// The version that goes with the text you based this on (from get_draft, or from an earlier update_draft that reported
+    /// merged: false). With it, your change merges with edits made since; without it, your text replaces whatever the draft
+    /// holds now, including anything the user just typed.
     pub base_version: Option<String>,
 }
 
@@ -139,8 +163,10 @@ impl Scratchpad {
             Ok(v) => {
                 let mut out =
                     serde_json::from_value::<DraftSummary>(v.clone()).map(|s| summary_json(&s)).unwrap_or(v.clone());
-                if let Some(version) = v.get("version") {
-                    out["version"] = version.clone();
+                for key in ["version", "merged"] {
+                    if let Some(value) = v.get(key) {
+                        out[key] = value.clone();
+                    }
                 }
                 json_result(out)
             }
@@ -192,19 +218,36 @@ impl Scratchpad {
     }
 
     #[tool(
-        description = "Read a draft: its metadata (including the version to pass to update_draft) followed by its full markdown.",
+        description = "Read a draft: its metadata, including the version that goes with this text, followed by its full \
+                       markdown. Pass known_version to skip the text when nothing has changed.",
         annotations(read_only_hint = true)
     )]
-    async fn get_draft(&self, Parameters(args): Parameters<IdArgs>) -> Result<CallToolResult, McpError> {
-        Ok(match self.call::<DraftDetail>("drafts.get", json!({ "id": args.id })).await {
-            Ok(d) => {
-                let mut meta = summary_json(&d.summary);
-                meta["version"] = json!(d.version);
-                CallToolResult::success(vec![
-                    ContentBlock::text(serde_json::to_string_pretty(&meta).unwrap()),
-                    ContentBlock::text(d.text),
-                ])
+    async fn get_draft(&self, Parameters(args): Parameters<GetArgs>) -> Result<CallToolResult, McpError> {
+        let mut params = json!({ "id": args.id });
+        if let Some(known) = args.known_version {
+            params["knownVersion"] = json!(known);
+        }
+        Ok(match self.call::<Value>("drafts.get", params).await {
+            Ok(v) if v["unchanged"] == true => {
+                let mut meta =
+                    serde_json::from_value::<DraftSummary>(v.clone()).map(|s| summary_json(&s)).unwrap_or_default();
+                meta["version"] = v["version"].clone();
+                meta["unchanged"] = json!(true);
+                json_result(meta)
             }
+            Ok(v) => match serde_json::from_value::<DraftDetail>(v) {
+                Ok(d) => {
+                    let mut meta = summary_json(&d.summary);
+                    meta["version"] = json!(d.version);
+                    CallToolResult::success(vec![
+                        ContentBlock::text(serde_json::to_string_pretty(&meta).unwrap()),
+                        ContentBlock::text(d.text),
+                    ])
+                }
+                Err(e) => {
+                    CallToolResult::error(vec![ContentBlock::text(format!("unexpected reply from scratchpadd: {e}"))])
+                }
+            },
             Err(e) => e,
         })
     }
@@ -215,9 +258,10 @@ impl Scratchpad {
     }
 
     #[tool(
-        description = "Replace a draft's text. Pass base_version from get_draft so the change merges with anything the user \
-                       typed since you read it. Returns the new version.",
-        annotations(destructive_hint = false, idempotent_hint = true)
+        description = "Replace a draft's text with your complete revision, merged with any edits made since base_version. \
+                       Returns the new version and merged: if merged is true, other edits were combined with yours and you \
+                       should read the draft again before editing it further. Sending the same update twice applies it twice.",
+        annotations(destructive_hint = false)
     )]
     async fn update_draft(&self, Parameters(args): Parameters<UpdateArgs>) -> Result<CallToolResult, McpError> {
         let mut params = json!({ "id": args.id, "text": args.text });

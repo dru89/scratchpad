@@ -36,7 +36,7 @@ See [`docs/design.md`](docs/design.md) for the v1 design, [`docs/decisions.md`](
 Build and install the daemon and CLI (Rust 1.89 or newer):
 
 ```bash
-cargo install --path crates/daemon && cargo install --path crates/cli
+cargo install --locked --root ~/.local --path crates/daemon && cargo install --locked --root ~/.local --path crates/cli
 ```
 
 `scratchpad` starts the daemon (`scratchpadd`) the first time it needs it.
@@ -52,11 +52,13 @@ scratchpad archive 01M3F9ZX7F                  # also trash, restore
 
 Any unique prefix of an id works. Add `--json` to any command for machine-readable output.
 
-To give an agent access, register the MCP server. For Claude Code:
+To give an agent access, register the MCP server. For Claude Code, in every project:
 
 ```bash
-claude mcp add scratchpad -- scratchpad mcp
+claude mcp add --scope user scratchpad -- ~/.local/bin/scratchpad mcp
 ```
+
+(That assumes `cargo install --root ~/.local`; adjust the path to wherever `scratchpad` lives.)
 
 Data lives in `~/.local/share/scratchpad/` on Linux and `~/Library/Application Support/dev.unremarkable.scratchpad/` on macOS. The daemon logs to `daemon.log` there.
 

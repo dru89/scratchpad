@@ -96,6 +96,8 @@ async fn a_second_daemon_exits_and_the_socket_is_private() {
     assert_eq!(mode, 0o600);
     let dir_mode = std::fs::metadata(env.socket.parent().unwrap()).unwrap().permissions().mode() & 0o777;
     assert_eq!(dir_mode, 0o700);
+    let data_mode = std::fs::metadata(&env.data).unwrap().permissions().mode() & 0o777;
+    assert_eq!(data_mode, 0o700, "the data directory should be private");
 
     // The first daemon is still serving.
     let status = call(&mut s, "daemon.status", json!({})).await;

@@ -2,6 +2,10 @@
 
 Scope is the local-only Linux app: the daemon, the CLI and MCP server, and the Electron app. Sync, macOS and iOS come later, and this note only covers them where they constrain choices made now. Decisions and their reasoning live in [decisions.md](decisions.md).
 
+## Every editor is a device
+
+Anything that can change a draft's text is treated as a separate device making versioned edits: each editor window, other computers and phones, the CLI, and agents. Nothing overwrites a draft. A client that wants to replace text says which version that text came from, and its change is merged with everything written since, so the result can differ from what it sent. The protocol tells it when that happened, so it knows to read again before its next edit.
+
 ## Drafts
 
 A draft is one Loro document, identified by a ULID. ULIDs can be generated offline on any device and sort by creation time.
@@ -62,7 +66,7 @@ The document has two parts:
 | Data | `$XDG_DATA_HOME/scratchpad/` | `~/Library/Application Support/dev.unremarkable.scratchpad/` |
 | Socket | `$XDG_RUNTIME_DIR/scratchpad/daemon.sock` | the data directory |
 
-The socket directory is `0700` and the socket `0600`.
+The data and socket directories are `0700` and the socket `0600`.
 
 ## Storage
 
@@ -97,9 +101,9 @@ Every `id` parameter accepts a full id or any unique prefix of one, case-insensi
 | method | params | result / notes |
 | --- | --- | --- |
 | `drafts.list` | `states?` (default `["inbox"]`), `query?`, `limit?` (default 100), `cursor?` | Summaries (id, title, state, createdAt, modifiedAt, trashedAt, and a snippet when searching), newest `modifiedAt` first, plus `nextCursor` when there's more. |
-| `drafts.get` | `id` | The summary, the body as plain text, the whole `meta` map, and `version`. |
+| `drafts.get` | `id`, `knownVersion?` | The summary, the body as plain text, the whole `meta` map, and `version`. If `knownVersion` matches the current version, the reply is the summary plus `unchanged: true`, without the text. |
 | `drafts.create` | `text?`, `state?` | The new draft's summary and `version`. |
-| `drafts.setText` | `id`, `text`, `baseVersion?` | Replaces the body with a minimal diff. With `baseVersion` (from `drafts.get`), the diff is taken against that version and merged, so text written since, by you in the app, say, survives an agent's revision. Without it, the text replaces whatever the draft holds now. |
+| `drafts.setText` | `id`, `text`, `baseVersion?` | Replaces the body with a minimal diff. With `baseVersion` (from `drafts.get`), the diff is taken against that version and merged, so text written since, by you in the app, say, survives an agent's revision. Without it, the text replaces whatever the draft holds now. Returns the new `version` and `merged`: `false` means the draft is now exactly the caller's text and the version can be used for its next edit; `true` means other edits were combined in, so the caller should read again. |
 | `drafts.append` | `id`, `text`, `ensureNewline?` | With `ensureNewline`, the text starts on a new line if the draft doesn't already end with one. The CLI and MCP tool set it. |
 | `drafts.setState` | `id`, `state` | Doesn't change `modifiedAt`. |
 | `drafts.discard` | `id` | Deletes a draft outright. Refused unless the body is empty. |
@@ -117,7 +121,7 @@ Errors use JSON-RPC codes plus `-32001` no such draft, `-32002` ambiguous id (wi
 
 **CLI.** `scratchpad` covers `list`, `search`, `show`, `new`, `append`, `set`, `edit`, `archive`, `trash`, `restore`, `render`, `capture`, `open` and `daemon start|status|stop`, with `--json` on everything. `edit` opens `$VISUAL`/`$EDITOR` and writes back with `baseVersion`, so typing done in the app while the editor was open is kept.
 
-**MCP.** `scratchpad mcp` offers `list_drafts`, `search_drafts`, `get_draft`, `create_draft`, `update_draft`, `append_to_draft`, `archive_draft`, `trash_draft` and `restore_draft`. `get_draft` returns the version and its instructions tell agents to pass it to `update_draft`. No tool deletes permanently.
+**MCP.** `scratchpad mcp` offers `list_drafts`, `search_drafts`, `get_draft`, `create_draft`, `update_draft`, `append_to_draft`, `archive_draft`, `trash_draft` and `restore_draft`. Its instructions tell agents they're one editor among several: read with `get_draft`, send revisions with that version as `base_version`, re-read when a result says `merged: true`, and use `known_version` to check cheaply for changes. No tool deletes permanently.
 
 ## Editor windows
 

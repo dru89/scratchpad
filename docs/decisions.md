@@ -10,6 +10,8 @@ Newest first. Each entry says what was decided, why, and what would make us revi
 
 **Cost:** about 11 ms per `setText` on a 100k-word draft, against 5 ms without a base. Without `baseVersion`, `setText` still means "replace whatever is there now," for scripts that want that.
 
+**Follow-up, same day:** this is one case of a general rule, now at the top of the design: anything that edits text is a separate device making versioned edits. An editor's copy is only safe to edit from while it matches the version it goes with, so `setText` reports `merged` (whether other edits were combined in), and `drafts.get` accepts `knownVersion` to check for changes without resending the text. The MCP instructions walk agents through read, revise with `base_version`, re-read when `merged` is true.
+
 ## 2026-09-25: Capture window text is a regular draft from the first keystroke
 
 **Decision:** The capture window shows an ordinary draft, created on the first keystroke and saved and synced from then on. A draft that's still empty when its window closes is deleted outright. "Done" (Ctrl/Cmd+Enter) keeps the draft and clears the window. The idle rule and pinning apply to the capture window independently of the main window. Details are in [design.md](design.md#windows).
