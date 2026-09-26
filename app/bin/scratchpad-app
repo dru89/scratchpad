@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Runs the scratchpad app from this checkout (build it first: cd app && npm run build).
+#
+#   scratchpad-app [--background] [--capture [--new | --draft=<id>]] [--open=<id>]
+here=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
+exec "$here/node_modules/electron/dist/electron" "$here" "$@"

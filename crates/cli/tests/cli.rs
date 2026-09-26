@@ -21,6 +21,7 @@ impl Env {
         let mut c = Command::new(env!("CARGO_BIN_EXE_scratchpad"));
         c.env("SCRATCHPAD_DATA_DIR", self.dir.path().join("data"))
             .env("SCRATCHPAD_SOCKET", self.dir.path().join("run/daemon.sock"))
+            .env("SCRATCHPAD_APP", self.dir.path().join("no-app-installed"))
             .env_remove("XDG_ACTIVATION_TOKEN");
         c
     }
@@ -106,7 +107,31 @@ fn json_output_and_errors() {
     assert!(String::from_utf8_lossy(&ambiguous.stderr).contains("matches more than one draft"));
 
     let capture = env.run(&["capture"]);
-    assert!(String::from_utf8_lossy(&capture.stderr).contains("app isn't running"));
+    assert!(!capture.status.success(), "no app and no launcher: capture fails");
+}
+
+#[test]
+fn capture_starts_the_app_when_it_isnt_running() {
+    let env = Env::new();
+    let log = env.dir.path().join("launched");
+    let fake = env.dir.path().join("fake-app");
+    std::fs::write(&fake, format!("#!/bin/sh\necho \"$@\" >> {}\n", log.display())).unwrap();
+    std::fs::set_permissions(&fake, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let id = env.ok(&["new", "draft to open"]).trim().to_string();
+
+    for args in [&["capture"][..], &["capture", "--new"], &["open", &id[..14]]] {
+        let out = env.cmd().args(args).env("SCRATCHPAD_APP", &fake).output().unwrap();
+        assert!(out.status.success(), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+    let mut launched = String::new();
+    for _ in 0..50 {
+        launched = std::fs::read_to_string(&log).unwrap_or_default();
+        if launched.lines().count() == 3 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert_eq!(launched, format!("--capture\n--capture --new\n--open={id}\n"));
 }
 
 #[test]

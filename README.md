@@ -1,6 +1,6 @@
 # scratchpad
 
-Working name for a Drafts-style scratchpad: a place where text starts, gets shaped, and then gets copied somewhere else. The daemon, CLI and MCP server work today; the app doesn't exist yet.
+Working name for a Drafts-style scratchpad: a place where text starts, gets shaped, and then gets copied somewhere else. The daemon, CLI, MCP server and Linux desktop app work today; sync and the other platforms don't exist yet.
 
 ## What it needs to do
 
@@ -27,7 +27,7 @@ See [`docs/design.md`](docs/design.md) for the v1 design, [`docs/decisions.md`](
 1. ~~**Design note.**~~ Done: [`docs/design.md`](docs/design.md).
 2. ~~**Editor binding spike.**~~ Done: [`spikes/editor-binding`](spikes/editor-binding/). Each window keeps a Loro copy of the draft bound to CodeMirror; agent edits merge live and undo stays local.
 3. ~~**Daemon, CLI and MCP.**~~ Done: [`crates/`](crates/). Agents can use drafts before there's a UI.
-4. **Electron app on Linux.** Sidebar (Inbox/Archive/Trash), multi-window, a capture window created hidden at startup and opened by a KDE shortcut, float-on-top via KWin, and rich copy. Then use it in place of Drafts on Linux.
+4. ~~**Electron app on Linux.**~~ Built: [`app/`](app/). Next is using it in place of Drafts for a while and fixing what that turns up.
 5. **Sync.** A Rust server on ds9, E2EE via Loro `%ELO`, and device enrollment. Plus the Mac build of the Electron app.
 6. **iOS app.**
 
@@ -62,11 +62,24 @@ claude mcp add --scope user scratchpad -- ~/.local/bin/scratchpad mcp
 
 Data lives in `~/.local/share/scratchpad/` on Linux and `~/Library/Application Support/dev.unremarkable.scratchpad/` on macOS. The daemon logs to `daemon.log` there.
 
+### The desktop app
+
+```bash
+cd app && npm install && npm run build
+scripts/install-linux.sh     # launcher, desktop entry, autostart, and the capture shortcut
+```
+
+The install script links `~/.local/bin/scratchpad-app`, adds scratchpad to the application launcher, starts it in the background at login (`--no-autostart` to skip), and registers a "scratchpad capture" command with Meta+Shift+2 as its default. Confirm that binding once in System Settings > Keyboard > Shortcuts. `--uninstall` removes it all. Without installing, `npm start` in `app/` runs it directly.
+
+The main window has the sidebar and an editor; the capture window floats and hides with Esc; Ctrl+Enter files a capture and clears it; Ctrl+K finds any draft; Ctrl+Shift+C copies as rich text. The full list is in [`docs/design.md`](docs/design.md#capture-window-actions).
+
 ## Developing
 
 ```bash
 cargo test --workspace         # unit tests plus end-to-end tests of the real binaries
 cargo build --release && scripts/load-test.py   # timings with 2,000 drafts and a 100k-word draft
+cd app && npm test             # renderer unit tests
+cd app && npm run test:e2e     # the real app against a throwaway daemon (needs a display; build the workspace first)
 ```
 
 `SCRATCHPAD_DATA_DIR` and `SCRATCHPAD_SOCKET` point a daemon and its clients somewhere other than the defaults, which is how the tests stay isolated.
@@ -76,6 +89,7 @@ cargo build --release && scripts/load-test.py   # timings with 2,000 drafts and 
 - `crates/core/`: the draft model, SQLite store, titles, search, rendering and protocol types. It's a library so the iOS app can embed it.
 - `crates/daemon/`: `scratchpadd`.
 - `crates/cli/`: `scratchpad`, including `scratchpad mcp`.
+- `app/`: the Electron desktop app. `electron/` is the main process, `src/` the windows.
 - `docs/`: design, decisions and research notes.
 - `spikes/`: throwaway experiments that answer one question each.
 - `scripts/`: the load test.

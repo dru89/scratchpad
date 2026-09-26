@@ -163,8 +163,29 @@ Window state (current draft, pinned, when the draft was loaded, float) is local 
 | Pin / unpin | pin button, Ctrl+Shift+P | pin button, Cmd+Shift+P | Stops or resumes the idle rollover for this window only. |
 | Dismiss | Esc | Esc | Hides the window. An empty draft is discarded. |
 
+### Other shortcuts
+
+Ctrl on Linux, Cmd on macOS.
+
+| action | keys |
+| --- | --- |
+| Float on top | Ctrl+Shift+F |
+| Copy as rich text | Ctrl+Shift+C |
+| Archive / move to Inbox | Ctrl+Shift+A |
+| Trash / restore | Ctrl+Shift+Backspace |
+| Open the draft in its own window | Ctrl+Shift+O |
+| Toggle the sidebar | Ctrl+\ |
+| Inbox / Archive / Trash | Ctrl+1 / Ctrl+2 / Ctrl+3 |
+| Filter the sidebar | Ctrl+Shift+L |
+| Find in the draft | Ctrl+F |
+
+Archiving or trashing from the main or capture window moves that window on to a new draft; a draft's own window stays on it and shows a badge.
+
+Closing the main or capture window hides it, so the app keeps running for the hotkey; Ctrl+Q quits. Launching the app again shows the main window.
+
 **Hotkey plumbing.**
-- On Linux, a KDE custom shortcut runs `scratchpad capture`, which reaches the app through the daemon. KDE's built-in global-shortcut service is unreliable on this Plasma version.
+- On Linux, a KDE custom command runs `scratchpad capture`, which reaches the app through the daemon. KDE's portal-based global shortcuts are unreliable on this Plasma version; a custom command doesn't use the portal. The app then focuses the window through KWin, since Wayland won't let it take focus itself.
+- If the app isn't running, `scratchpad capture` (and `scratchpad open`) start it with `scratchpad-app --capture` (or `--open=<id>`).
 - On macOS, the app registers Cmd+Shift+2 itself with Electron's `globalShortcut` and starts at login.
 - `scratchpad capture` works everywhere, so Raycast, Keyboard Maestro or an agent can summon the window too.
 

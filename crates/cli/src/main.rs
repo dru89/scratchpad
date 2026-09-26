@@ -230,13 +230,61 @@ async fn run(cli: Cli) -> Result<()> {
                 "draftId": draft,
                 "activationToken": std::env::var("XDG_ACTIVATION_TOKEN").ok(),
             });
-            let _: Value = c.call("ui.capture", params).await?;
+            if let Err(e) = c.call::<Value>("ui.capture", params).await {
+                if !is_no_app(&e) {
+                    return Err(e);
+                }
+                let mut args = vec!["--capture".to_string()];
+                if new {
+                    args.push("--new".into());
+                }
+                if let Some(id) = draft {
+                    args.push(format!("--draft={id}"));
+                }
+                launch_app(&args)?;
+            }
         }
         Cmd::Open { id } => {
-            let _: Value = c.call("ui.open", json!({ "id": id })).await?;
+            if let Err(e) = c.call::<Value>("ui.open", json!({ "id": id })).await {
+                if !is_no_app(&e) {
+                    return Err(e);
+                }
+                let d: DraftDetail = c.call("drafts.get", json!({ "id": id })).await?;
+                launch_app(&[format!("--open={}", d.summary.id)])?;
+            }
         }
         Cmd::Mcp | Cmd::Daemon { .. } => unreachable!(),
     }
+    Ok(())
+}
+
+fn is_no_app(e: &anyhow::Error) -> bool {
+    e.downcast_ref::<RpcError>().is_some_and(|rpc| rpc.code == codes::NO_APP)
+}
+
+/// Starts the app when it isn't running, so the capture hotkey always works:
+/// $SCRATCHPAD_APP, else `scratchpad-app` on the PATH or in ~/.local/bin.
+fn launch_app(args: &[String]) -> Result<()> {
+    use std::os::unix::process::CommandExt;
+    let app = std::env::var_os("SCRATCHPAD_APP").map(std::path::PathBuf::from).or_else(|| {
+        let on_path = std::env::var_os("PATH")
+            .into_iter()
+            .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+            .map(|dir| dir.join("scratchpad-app"));
+        let local = std::env::var_os("HOME").map(|h| std::path::Path::new(&h).join(".local/bin/scratchpad-app"));
+        on_path.chain(local).find(|p| p.is_file())
+    });
+    let Some(app) = app else {
+        bail!("the scratchpad app isn't running, and scratchpad-app isn't installed");
+    };
+    std::process::Command::new(&app)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .process_group(0)
+        .spawn()
+        .with_context(|| format!("starting {}", app.display()))?;
     Ok(())
 }
 
