@@ -1,7 +1,8 @@
 // End-to-end: the real app, a real daemon, and the real CLI standing in for
-// agents and the hotkey, all in a throwaway data directory. Needs a display.
+// agents and the hotkey, all in a throwaway data directory. Needs a display,
+// real or virtual.
 //
-//   cargo build --workspace && npm run test:e2e
+//   cargo build --workspace && npm run test:e2e:headless
 
 import { _electron as electron, type ElectronApplication, expect, type Page, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
@@ -10,6 +11,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const repo = resolve(__dirname, '..', '..');
+// Wayland normally; X11 when there's no Wayland display, as under
+// `npm run test:e2e:headless`, which keeps the run off your screen.
+const platform = process.env.WAYLAND_DISPLAY ? 'wayland' : 'x11';
 const cli = join(repo, 'target', 'debug', 'scratchpad');
 const shots = process.env.SCRATCHPAD_SHOTS;
 
@@ -61,7 +65,7 @@ test.describe.serial('scratchpad app', () => {
       SCRATCHPAD_DAEMON: join(repo, 'target', 'debug', 'scratchpadd'),
       SCRATCHPAD_IDLE_MS: '1500',
     };
-    app = await electron.launch({ args: ['--ozone-platform=wayland', '.'], cwd: resolve(__dirname, '..'), env });
+    app = await electron.launch({ args: [`--ozone-platform=${platform}`, '.'], cwd: resolve(__dirname, '..'), env });
   });
 
   test.afterAll(async () => {
@@ -209,5 +213,21 @@ test.describe.serial('scratchpad app', () => {
     await shot(main, 'switcher');
     await main.keyboard.press('Enter');
     await expect.poll(() => editorText(main)).toContain('Quick thought from the hotkey');
+  });
+
+  test('find marks matches inside a rendered table', async () => {
+    const main = await windowOf('main');
+    await main.keyboard.press('Control+n');
+    await main.keyboard.type('Status\n\n| part | note |\n| - | - |\n| server | needs **more** work |\n\nsee more below');
+    const table = main.locator('.cm-table-wrap');
+    await expect(table).toBeVisible();
+    await main.keyboard.press('Control+f');
+    await main.keyboard.type('more');
+    await expect(main.locator('.find-count')).toHaveText('2 matches');
+    await expect(table.locator('.cm-searchMatch')).toHaveText(['more']);
+    await expect(table.locator('strong')).toHaveText('more');
+    await main.keyboard.press('Escape');
+    await expect(table.locator('.cm-searchMatch')).toHaveCount(0);
+    await expect(table.locator('td').last()).toHaveText('needs more work');
   });
 });

@@ -15,6 +15,7 @@
     "start": "npm run build && electron --ozone-platform=wayland .",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",
+    "test:e2e:headless": "npm run build && env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 xvfb-run -a -s '-screen 0 1920x1200x24' playwright test",
     "screenshots": "npm run build && SCRATCHPAD_SCREENSHOTS=../docs/design-handoff/screenshots playwright test screenshots"
   },
   "dependencies": {

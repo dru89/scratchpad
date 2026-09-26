@@ -2,10 +2,12 @@
 // HTML table while the selection is outside it and falls back to raw
 // markdown when the selection enters. Clicking a cell puts the cursor at that
 // cell's position in the source. Block decorations have to come from a
-// StateField, not a ViewPlugin.
+// StateField, not a ViewPlugin. While find is open, the widget marks matches
+// in its cells, since CodeMirror's search highlighting can't reach inside it.
 
 import { syntaxTree } from '@codemirror/language';
-import { type EditorState, type Range, StateField } from '@codemirror/state';
+import { getSearchQuery, type SearchQuery, searchPanelOpen } from '@codemirror/search';
+import { type EditorState, type Range, StateField, Text } from '@codemirror/state';
 import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemirror/view';
 import { touches } from './livepreview';
 
@@ -32,6 +34,7 @@ interface TablesState {
   spans: Span[];
   decos: DecorationSet;
   activeKey: string;
+  query: SearchQuery | null;
 }
 
 function splitRow(line: string, lineOffset: number): Cell[] {
@@ -91,18 +94,84 @@ function inline(text: string): string {
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '<a>$1</a>');
 }
 
+/** The find query to mark in tables: set while find is open with something valid to look for. */
+function activeQuery(state: EditorState): SearchQuery | null {
+  const query = getSearchQuery(state);
+  return searchPanelOpen(state) && query.search && query.valid ? query : null;
+}
+
+const sameQuery = (a: SearchQuery | null, b: SearchQuery | null) => a === b || (!!a && !!b && a.eq(b));
+
+/**
+ * Where `query` matches in a cell whose text is split across `texts` (its
+ * text nodes): [text index, from, to] for each piece, one per text a match
+ * touches. Matching runs on the rendered text, so a match that's all syntax
+ * in the source is counted by find but not marked here.
+ */
+export function matchPieces(query: SearchQuery, texts: string[]): [number, number, number][] {
+  const starts: number[] = [];
+  let joined = '';
+  for (const t of texts) {
+    starts.push(joined.length);
+    joined += t;
+  }
+  const pieces: [number, number, number][] = [];
+  if (!joined) return pieces;
+  const cursor = query.getCursor(Text.of(joined.split('\n')));
+  for (let m = cursor.next(); !m.done; m = cursor.next()) {
+    texts.forEach((t, i) => {
+      const from = Math.max(m.value.from, starts[i]) - starts[i];
+      const to = Math.min(m.value.to, starts[i] + t.length) - starts[i];
+      if (from < to) pieces.push([i, from, to]);
+    });
+  }
+  return pieces;
+}
+
+/** Marks matches of `query` in the table's cells, clearing the old marks first. */
+function markMatches(wrap: HTMLElement, query: SearchQuery | null) {
+  for (const mark of wrap.querySelectorAll('.cm-searchMatch')) mark.replaceWith(...mark.childNodes);
+  wrap.normalize();
+  if (!query) return;
+  for (const cell of wrap.querySelectorAll('th, td')) {
+    const nodes: globalThis.Text[] = [];
+    const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as globalThis.Text);
+    // Back to front, so wrapping one piece doesn't move the ones still to come.
+    for (const [i, from, to] of matchPieces(query, nodes.map((n) => n.data)).reverse()) {
+      const range = document.createRange();
+      range.setStart(nodes[i], from);
+      range.setEnd(nodes[i], to);
+      const mark = document.createElement('span');
+      mark.className = 'cm-searchMatch';
+      range.surroundContents(mark);
+    }
+  }
+}
+
 const ROW_PX = 34;
+
+/** The widget that drew each table, so updateDOM can tell whether only the marks changed. */
+const drawnBy = new WeakMap<HTMLElement, TableWidget>();
 
 class TableWidget extends WidgetType {
   constructor(
     readonly model: TableModel,
     readonly src: string,
+    readonly query: SearchQuery | null,
   ) {
     super();
   }
 
   eq(other: TableWidget) {
-    return other.src === this.src;
+    return other.src === this.src && sameQuery(other.query, this.query);
+  }
+
+  updateDOM(dom: HTMLElement) {
+    if (drawnBy.get(dom)?.src !== this.src) return false;
+    markMatches(dom, this.query);
+    drawnBy.set(dom, this);
+    return true;
   }
 
   get estimatedHeight() {
@@ -134,6 +203,8 @@ class TableWidget extends WidgetType {
     }
 
     wrap.appendChild(table);
+    markMatches(wrap, this.query);
+    drawnBy.set(wrap, this);
     wrap.addEventListener('mousedown', (e) => {
       const target = (e.target as HTMLElement).closest<HTMLElement>('[data-offset]');
       if (!target) return;
@@ -162,6 +233,7 @@ const modelCache = new Map<string, TableModel>();
 
 function compute(state: EditorState, known?: Span[]): TablesState {
   const spans = known ?? findTables(state);
+  const query = activeQuery(state);
   const decos: Range<Decoration>[] = [];
   const active: number[] = [];
   spans.forEach((s, i) => {
@@ -176,9 +248,9 @@ function compute(state: EditorState, known?: Span[]): TablesState {
       model = parseTable(src);
       modelCache.set(src, model);
     }
-    decos.push(Decoration.replace({ widget: new TableWidget(model, src), block: true }).range(s.from, s.to));
+    decos.push(Decoration.replace({ widget: new TableWidget(model, src, query), block: true }).range(s.from, s.to));
   });
-  return { spans, decos: Decoration.set(decos), activeKey: active.join(',') };
+  return { spans, decos: Decoration.set(decos), activeKey: active.join(','), query };
 }
 
 function activeKey(state: EditorState, spans: Span[]): string {
@@ -191,7 +263,10 @@ export const tables = StateField.define<TablesState>({
   create: (state) => compute(state),
   update(value, tr) {
     if (tr.docChanged || syntaxTree(tr.startState) !== syntaxTree(tr.state)) return compute(tr.state);
-    if (tr.selection && activeKey(tr.state, value.spans) !== value.activeKey) {
+    if (
+      (tr.selection && activeKey(tr.state, value.spans) !== value.activeKey) ||
+      !sameQuery(activeQuery(tr.state), value.query)
+    ) {
       return compute(tr.state, value.spans);
     }
     return value;

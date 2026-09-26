@@ -59,7 +59,7 @@ Line classes come from [`editor/livepreview.ts`](../app/src/editor/livepreview.t
 | `.cm-bullet`, `.cm-rule`, `.cm-task` (+ `.is-done`) | display-only widgets in livepreview.ts |
 | `.cm-link-text` | the rendered text of a link, livepreview.ts |
 | `.cm-strong`, `.cm-em`, `.cm-strike`, `.cm-inline-code`, `.cm-link`, `.cm-url`, `.cm-mark` | HighlightStyle in setup.ts |
-| `.cm-table-wrap` | the table widget in tables.ts |
+| `.cm-table-wrap`, and `.cm-searchMatch` in its cells while find is open | the table widget in tables.ts |
 
 Two CodeMirror rules to keep in mind. CodeMirror mounts its own styles after `style.css`, so rules for line classes are written `.cm-editor .cm-line.cm-x` to outrank its default line padding, and anything else that fights its base theme goes in `EditorView.theme` in setup.ts. And use padding, never margins, on lines: CodeMirror measures line boxes, and margins throw that off.
 
@@ -71,7 +71,7 @@ Two CodeMirror rules to keep in mind. CodeMirror mounts its own styles after `st
 
 **Draft window.** Like the main window without the sidebar, pin or new-draft button. The title and its state badge start the toolbar.
 
-**Overlays.** The quick switcher is a `--raised` box over a flat `--scrim`, never a blur, with a keycap footer. Find is one slim row in CodeMirror's top panel slot ([`editor/find.ts`](../app/src/editor/find.ts)), with replace on a second row that opens only with Ctrl+H or its toggle. The toast is a pill at the bottom center, above the footer in the capture window.
+**Overlays.** The quick switcher is a `--raised` box over a flat `--scrim`, never a blur, with a keycap footer. Find is one slim row in CodeMirror's top panel slot ([`editor/find.ts`](../app/src/editor/find.ts)), with replace on a second row that opens only with Ctrl+H or its toggle. A rendered table marks find's matches in its own cells, in the same `.cm-searchMatch` style; it matches the text as shown, so a match that's only syntax (`**`) is counted but not marked until the table opens. The toast is a pill at the bottom center, above the footer in the capture window.
 
 ## Toolbar
 
@@ -106,6 +106,4 @@ These aren't designed yet, and each has a place reserved. A sync indicator takes
 
 ## Known gaps
 
-- Search snippets from the daemon (`crates/core/src/search.rs`) still carry raw markdown (`##`, `|`, `-`). They should be stripped there, with block boundaries joined by " · ", before the app highlights them.
-- Find counts matches inside a rendered table but can't highlight them, because the table is a widget. Stepping to one moves the selection into the table, which turns back into markdown and shows the highlight.
 - The app icon and wordmark in the design system are a direction, not finished; the 16px icon needs a hand-hinted version.

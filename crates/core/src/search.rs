@@ -2,6 +2,8 @@
 //! is SQLite FTS5 with the trigram tokenizer, so any term of three or more
 //! characters matches anywhere inside a word.
 
+use crate::plain;
+
 /// Splits a query into terms: quoted phrases stay whole, everything else
 /// splits on whitespace.
 pub fn terms(query: &str) -> Vec<String> {
@@ -48,27 +50,110 @@ fn escape_like(s: &str) -> String {
     s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
 }
 
-/// Text around the first match of any term, on one line, with ellipses where
-/// it was cut.
+/// Context kept on each side of the match, in bytes of plain text.
+const BEFORE: usize = 40;
+const AFTER: usize = 80;
+/// How much markdown around the match is read to fill that context. More
+/// than the context, because the syntax drops out.
+const READ_BEFORE: usize = 120;
+const READ_AFTER: usize = 200;
+/// The read is widened to take in the whole of its first and last lines, so
+/// their block markers can be recognized, unless a line runs on this far.
+const LINE_SLACK: usize = 160;
+/// How far a cut moves to land between words.
+const WORD_SLACK: usize = 16;
+
+/// Text around the first match of any term, on one line: each line's
+/// markdown stripped the way titles strip it, table rows as their cells,
+/// lines joined with " · ", and ellipses where it was cut.
 pub fn snippet(body: &str, terms: &[String]) -> Option<String> {
     let lower = body.to_lowercase();
     // Lowercasing can change byte lengths for some scripts; only trust the
     // position when it maps back onto a char boundary in the original.
-    let (at, len) =
-        terms.iter().filter_map(|t| lower.find(&t.to_lowercase()).map(|i| (i, t.len()))).min_by_key(|(i, _)| *i)?;
+    let (at, term) =
+        terms.iter().filter_map(|t| lower.find(&t.to_lowercase()).map(|i| (i, t))).min_by_key(|(i, _)| *i)?;
     if !body.is_char_boundary(at) {
         return None;
     }
-    let start = floor_boundary(body, at.saturating_sub(40));
-    let end = floor_boundary(body, (at + len + 80).min(body.len()));
-    let mut s = body[start..end].split_whitespace().collect::<Vec<_>>().join(" ");
-    if start > 0 {
+
+    let mut from = floor_boundary(body, at.saturating_sub(READ_BEFORE));
+    let first_line = body[..from].rfind('\n').map_or(0, |i| i + 1);
+    let first_whole = from - first_line <= LINE_SLACK;
+    if first_whole {
+        from = first_line;
+    }
+    let mut to = floor_boundary(body, (at + term.len() + READ_AFTER).min(body.len()));
+    match body[to..].find('\n') {
+        Some(i) if i <= LINE_SLACK => to += i,
+        None if body.len() - to <= LINE_SLACK => to = body.len(),
+        _ => {}
+    }
+
+    // Whether the read starts inside a fenced code block, whose lines are
+    // kept as written.
+    let mut in_code = body[..first_line].lines().filter(|l| plain::is_fence(l)).count() % 2 == 1;
+    let mut text = String::new();
+    let mut anchor = None;
+    let mut line_start = from;
+    for (i, line) in body[from..to].split('\n').enumerate() {
+        let whole = i > 0 || first_whole;
+        let part = if whole && plain::is_fence(line) {
+            in_code = !in_code;
+            String::new()
+        } else if in_code {
+            plain::collapse_whitespace(line)
+        } else if !whole {
+            plain::fragment_text(line)
+        } else if plain::is_rule(line) || plain::is_table_divider(line.trim()) {
+            String::new()
+        } else {
+            plain::line_text(line, ", ")
+        };
+        if !part.is_empty() && !text.is_empty() {
+            text.push_str(" · ");
+        }
+        line_start += line.len() + 1;
+        if anchor.is_none() && at < line_start {
+            // Where the term lands once the line's syntax is gone; the start
+            // of the line if the term was part of the syntax.
+            anchor = Some(text.len() + find_ignoring_case(&part, term).unwrap_or(0));
+        }
+        text.push_str(&part);
+    }
+
+    let anchor = anchor.unwrap_or(text.len());
+    let match_end = floor_boundary(&text, (anchor + term.len()).min(text.len()));
+    let mut start = floor_boundary(&text, anchor.saturating_sub(BEFORE));
+    let mut end = floor_boundary(&text, (match_end + AFTER).min(text.len()));
+    // Cut between words when there's a space nearby.
+    if start > 0
+        && !text[..start].ends_with(' ')
+        && let Some(i) = text[start..anchor].find(' ').filter(|&i| i < WORD_SLACK)
+    {
+        start += i + 1;
+    }
+    if end < text.len()
+        && !text[end..].starts_with(' ')
+        && let Some(i) = text[match_end..end].rfind(' ').filter(|&i| end - (match_end + i) < WORD_SLACK)
+    {
+        end = match_end + i;
+    }
+    let mut s = text[start..end].trim_matches([' ', '·']).to_string();
+    if s.is_empty() {
+        return None;
+    }
+    if start > 0 || !body[..from].trim().is_empty() {
         s.insert(0, '…');
     }
-    if end < body.len() {
+    if end < text.len() || !body[to..].trim().is_empty() {
         s.push('…');
     }
     Some(s)
+}
+
+fn find_ignoring_case(text: &str, term: &str) -> Option<usize> {
+    let i = text.to_lowercase().find(&term.to_lowercase())?;
+    text.is_char_boundary(i).then_some(i)
 }
 
 fn floor_boundary(s: &str, mut i: usize) -> usize {
@@ -113,5 +198,48 @@ mod tests {
     fn snippet_handles_multibyte_text() {
         let body = "café ".repeat(30) + "résumé target " + &"naïve ".repeat(30);
         assert!(snippet(&body, &["target".into()]).unwrap().contains("target"));
+        let body = format!("## Über\n\n{}\n\n- target\n\n{}", "é".repeat(90), "ü".repeat(90));
+        assert!(snippet(&body, &["target".into()]).unwrap().contains("é · target · ü"));
+    }
+
+    #[test]
+    fn snippet_strips_markdown_line_by_line() {
+        let body =
+            "## Sync\n\n| part | owner |\n| --- | --- |\n| **server** | [me](https://x) |\n\n- [ ] needle in a list\n";
+        assert_eq!(snippet(body, &["needle".into()]).unwrap(), "Sync · part, owner · server, me · needle in a list");
+        let body = "> quoted *needle*\n\n---\n\n1. first\n";
+        assert_eq!(snippet(body, &["needle".into()]).unwrap(), "quoted needle · first");
+    }
+
+    #[test]
+    fn snippet_cuts_the_plain_text_around_the_match() {
+        let body = format!("# Title\n\n{}\n\n**the needle**\n\n{}", "- item\n".repeat(20), "- more\n".repeat(20));
+        let s = snippet(&body, &["needle".into()]).unwrap();
+        assert!(s.starts_with("…item · item") && s.ends_with("more · more…"), "{s}");
+        assert!(s.contains("item · the needle · more"));
+        assert!(!s.contains(['-', '*']));
+    }
+
+    #[test]
+    fn snippet_keeps_code_as_written() {
+        let body = "Setup\n\n```sh\n# install deps\nneedle --fast\n```\n";
+        assert_eq!(snippet(body, &["needle".into()]).unwrap(), "Setup · # install deps · needle --fast");
+        // The fence opens before the part of the text that's read.
+        let body = format!("```\n{}# still code, needle\n```", "x = 1\n".repeat(60));
+        assert!(snippet(&body, &["needle".into()]).unwrap().ends_with("x = 1 · # still code, needle"));
+    }
+
+    #[test]
+    fn snippet_reads_part_of_a_long_line() {
+        let body = format!("# Title\n\n{}a needle {}\n\n# Next", "word ".repeat(100), "word ".repeat(100));
+        let s = snippet(&body, &["needle".into()]).unwrap();
+        assert!(s.starts_with("…word") && s.ends_with("word…"), "{s}");
+        assert!(!s.contains("Title") && !s.contains("Next"));
+    }
+
+    #[test]
+    fn snippet_falls_back_to_the_line_when_the_match_was_syntax() {
+        let body = "# Links\n\nSee [the docs](https://example.com/guide) first";
+        assert_eq!(snippet(body, &["example.com".into()]).unwrap(), "Links · See the docs first");
     }
 }

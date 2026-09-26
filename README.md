@@ -80,6 +80,7 @@ cargo test --workspace         # unit tests plus end-to-end tests of the real bi
 cargo build --release && scripts/load-test.py   # timings with 2,000 drafts and a 100k-word draft
 cd app && npm test             # renderer unit tests
 cd app && npm run test:e2e     # the real app against a throwaway daemon (needs a display; build the workspace first)
+cd app && npm run test:e2e:headless   # the same on a virtual X display (xvfb-run), so it doesn't take your focus
 ```
 
 `SCRATCHPAD_DATA_DIR` and `SCRATCHPAD_SOCKET` point a daemon and its clients somewhere other than the defaults, which is how the tests stay isolated.

@@ -15,6 +15,9 @@ const out = process.env.SCRATCHPAD_SCREENSHOTS;
 test.skip(!out, 'set SCRATCHPAD_SCREENSHOTS to write screenshots');
 
 const repo = resolve(__dirname, '..', '..');
+// Wayland normally; X11 when there's no Wayland display, as under
+// `npm run test:e2e:headless`, which keeps the run off your screen.
+const platform = process.env.WAYLAND_DISPLAY ? 'wayland' : 'x11';
 const cli = join(repo, 'target', 'debug', 'scratchpad');
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -198,7 +201,7 @@ test.describe.serial('design screenshots', () => {
       SCRATCHPAD_DAEMON: wrapper,
     };
     run('daemon', 'start');
-    app = await electron.launch({ args: ['--ozone-platform=wayland', '.'], cwd: resolve(__dirname, '..'), env });
+    app = await electron.launch({ args: [`--ozone-platform=${platform}`, '.'], cwd: resolve(__dirname, '..'), env });
   });
 
   test.afterAll(async () => {

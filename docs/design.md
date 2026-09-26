@@ -196,9 +196,11 @@ Closing the main or capture window hides it, so the app keeps running for the ho
 
 `drafts.list` with a `query` searches the FTS5 trigram index, so partial words match and "sync" finds "resync". Queries are plain words, all of which must match, plus quoted phrases. Queries shorter than three characters fall back to a title prefix match.
 
+Each result carries a snippet: a line of plain text around the first match. The daemon reads the markdown around it, strips each line the way titles are stripped (table rows become their cells, joined with commas), joins the lines with " · ", and cuts about 40 bytes before the match and 80 after, between words. Fenced code is kept as written. The app highlights the matched words itself.
+
 - **Sidebar filter box:** narrows the current list (Inbox, Archive or Trash) as you type.
 - **Quick switcher (Ctrl+K, Cmd+K on macOS):** searches every state except Trash. Enter opens the result in the current editor, which is the capture window when opened from there. Ctrl+Enter (Cmd+Enter on macOS) opens it in a new window.
-- **Find within a draft:** a slim panel over CodeMirror's search ([`app/src/editor/find.ts`](../app/src/editor/find.ts)), with replace on Ctrl+H.
+- **Find within a draft:** a slim panel over CodeMirror's search ([`app/src/editor/find.ts`](../app/src/editor/find.ts)), with replace on Ctrl+H. A rendered table marks its own matches, because CodeMirror's highlighting can't reach inside the widget.
 
 Qualifiers like `in:archive`, and saved searches as a light form of organization, come later.
 

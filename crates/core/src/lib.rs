@@ -4,6 +4,7 @@
 
 pub mod draft;
 pub mod paths;
+mod plain;
 pub mod protocol;
 pub mod render;
 pub mod search;
