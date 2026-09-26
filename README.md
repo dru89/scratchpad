@@ -20,14 +20,11 @@ Working name for a Drafts-style scratchpad: a place where text starts, gets shap
 - iOS: SwiftUI shell hosting the same editor in a WKWebView, native text view for quick capture.
 - Sync: small Rust server storing opaque encrypted records (Loro `%ELO` framing).
 
-See [`docs/decisions.md`](docs/decisions.md) for the reasoning and [`docs/research.md`](docs/research.md) for the background.
+See [`docs/design.md`](docs/design.md) for the v1 design, [`docs/decisions.md`](docs/decisions.md) for the reasoning, and [`docs/research.md`](docs/research.md) for the background.
 
 ## Next
 
-1. **Design note.** Cover:
-   - the data model: the draft record, its states, titles taken from the first line, and trash tombstones;
-   - the socket protocol: JSON-RPC over a unix socket, with change notifications and a version handshake;
-   - how UI commands like "open capture" get from the CLI through the daemon to the app.
+1. ~~**Design note.**~~ Done: [`docs/design.md`](docs/design.md).
 2. **Editor binding spike.** The renderer keeps a Loro replica (`loro-crdt` WASM) bound to CodeMirror and exchanges updates with the daemon. Prove that an agent editing an open draft merges live without moving the cursor or breaking undo. This is the riskiest piece left.
 3. **Daemon, CLI and MCP.** CRUD, state changes, trash purge and change subscriptions. Agents can use drafts before there's a UI.
 4. **Electron app on Linux.** Sidebar (Inbox/Archive/Trash), multi-window, a capture window created hidden at startup and opened by a KDE shortcut, float-on-top via KWin, and rich copy. Then use it in place of Drafts on Linux.
@@ -36,5 +33,5 @@ See [`docs/decisions.md`](docs/decisions.md) for the reasoning and [`docs/resear
 
 ## Layout
 
-- `docs/` — decisions and research notes.
+- `docs/` — design, decisions and research notes.
 - `spikes/` — throwaway experiments that answer one question each.

@@ -2,6 +2,14 @@
 
 Newest first. Each entry says what was decided, why, and what would make us revisit it.
 
+## 2026-09-25: Capture window text is a regular draft from the first keystroke
+
+**Decision:** The capture window shows an ordinary draft, created on the first keystroke and saved and synced from then on. A draft that's still empty when its window closes is deleted outright. "Done" (Ctrl/Cmd+Enter) keeps the draft and clears the window. The idle rule and pinning apply to the capture window independently of the main window. Details are in [design.md](design.md#windows).
+
+**Why:** In Drafts, the capture window is a separate buffer that only becomes a draft when you save. Until then its text isn't synced, isn't visible to agents, and is lost if the app crashes, and it's a second kind of object with its own rules. A third option, hiding capture drafts from the Inbox until they're filed, brought back a special state. Creating the draft lazily and discarding empty ones keeps what's good about Drafts, which is that summoning and dismissing leaves nothing behind.
+
+**Revisit if:** half-finished captures clutter the Inbox in practice.
+
 ## 2026-09-23: The core runs as its own process
 
 **Decision:** A Rust daemon (`scratchpadd`, working name) owns the SQLite store, the Loro documents, the keys and the sync connection. The Electron app, the CLI, and the MCP server (`scratchpad mcp`, over stdio) are all clients of one local socket protocol. On iOS the same Rust library runs in-process.
