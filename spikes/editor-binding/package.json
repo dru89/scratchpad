@@ -1,0 +1,29 @@
+{
+  "name": "scratchpad-editor-binding",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fixture": "node ../shell-test/fixtures/gen.mjs 100000 fixtures/large.md",
+    "daemon": "cargo build --release --manifest-path daemon/Cargo.toml",
+    "typecheck": "tsc --noEmit",
+    "build": "vite build",
+    "start": "electron --ozone-platform=wayland electron/main.cjs",
+    "scenarios": "SPIKE_AUTORUN=1 electron --ozone-platform=wayland electron/main.cjs",
+    "history-cost": "node scripts/history-cost.mjs"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.13",
+    "@lezer/highlight": "^1.2.4",
+    "loro-codemirror": "^0.3.3",
+    "loro-crdt": "^1.16.3"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  }
+}

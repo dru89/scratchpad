@@ -25,7 +25,7 @@ See [`docs/design.md`](docs/design.md) for the v1 design, [`docs/decisions.md`](
 ## Next
 
 1. ~~**Design note.**~~ Done: [`docs/design.md`](docs/design.md).
-2. **Editor binding spike.** The renderer keeps a Loro replica (`loro-crdt` WASM) bound to CodeMirror and exchanges updates with the daemon. Prove that an agent editing an open draft merges live without moving the cursor or breaking undo. This is the riskiest piece left.
+2. ~~**Editor binding spike.**~~ Done: [`spikes/editor-binding`](spikes/editor-binding/). Each window keeps a Loro copy of the draft bound to CodeMirror; agent edits merge live and undo stays local.
 3. **Daemon, CLI and MCP.** CRUD, state changes, trash purge and change subscriptions. Agents can use drafts before there's a UI.
 4. **Electron app on Linux.** Sidebar (Inbox/Archive/Trash), multi-window, a capture window created hidden at startup and opened by a KDE shortcut, float-on-top via KWin, and rich copy. Then use it in place of Drafts on Linux.
 5. **Sync.** A Rust server on ds9, E2EE via Loro `%ELO`, and device enrollment. Plus the Mac build of the Electron app.

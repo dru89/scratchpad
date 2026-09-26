@@ -16,7 +16,7 @@ The document has two parts:
 | `schema` | int | Starts at 1. Bumped only for changes old clients would misread. |
 | `state` | `"inbox"` \| `"archived"` \| `"trashed"` | |
 | `createdAt` | ms timestamp | |
-| `modifiedAt` | ms timestamp | Stamped by the device where the edit happened, at most every few seconds while typing. The sidebar sorts on it. |
+| `modifiedAt` | ms timestamp | Stamped by the device where the edit happened, after a 1.5 s pause in typing (or every 30 s during nonstop typing). Stamping mid-burst would split the undo group. The sidebar sorts on it. |
 | `trashedAt` | ms timestamp or null | Set when trashed, cleared on restore. |
 
 **Room to grow.** Anything added later (tags, a folder, a flag, fields an action needs) is a new key in `meta`. Clients ignore keys they don't recognize and never delete them. Tags, if they arrive, are a `LoroMap` of tag to `true` rather than a list, so adding tags on two devices at once merges cleanly.
@@ -99,7 +99,7 @@ The daemon answers with its own protocol number and version. A client that sends
 | `drafts.discard` | `id` | Deletes a draft outright. Refused unless the body is empty. |
 | `drafts.render` | `id` or `text`, `format: "html"` | Markdown rendered by comrak with GitHub-style tables, for rich copy. |
 | `drafts.subscribe` / `unsubscribe` | | Notifications: `drafts.changed {summary}`, `drafts.removed {id}`. |
-| `doc.open` | `id`, `version?` | A snapshot, or the updates since `version`, plus the current version. Starts `doc.update` notifications for that draft. |
+| `doc.open` | `id`, `version?` | A snapshot, or the updates since `version`, plus the current version. Starts `doc.update` notifications for that draft. The reply is sent before releasing the draft's lock, so no update for that draft reaches the client ahead of it. |
 | `doc.push` | `id`, `update` | Applies a Loro update from an editor window. |
 | `doc.close` | `id` | |
 | `ui.capture` | `mode?: "summon" \| "new"`, `draftId?` | Forwarded to the `ui` client. If no app is connected, the daemon launches it with the same arguments. |
@@ -113,7 +113,8 @@ Each editor window keeps its own Loro copy of its draft (`loro-crdt` WASM in the
 
 - **Concurrent edits** from agents, other windows or other devices merge in the CRDT, and CodeMirror moves the cursor along with any text that shifts around it.
 - **If the daemon restarts,** the window keeps working and catches up by version on reconnect.
-- **Undo** uses Loro's `UndoManager`, so Ctrl+Z reverts only your own edits, never an agent's.
+- **Undo** uses Loro's `UndoManager`, so Ctrl+Z reverts only your own edits, never an agent's. Undo restores the selection saved as Loro cursors, and redo leaves the cursor at the end of what it restored. A remote edit that arrives mid-typing splits the undo group; merging adjacent steps is a later refinement.
+- **The binding is our own**, about 150 lines. The published `loro-codemirror` drops text changes that share a batch with a `meta` change.
 
 ## Windows
 
@@ -171,9 +172,12 @@ Qualifiers like `in:archive`, and saved searches as a light form of organization
 
 Tags, folders, actions, saved searches, sort options other than last modified, sync, and the macOS and iOS apps. The design leaves room for each.
 
-## To prove in the spike
+## Proven in the spike
 
-- **Binding CodeMirror to Loro:** remote edits map cleanly into the editor, the cursor holds its place, and IME composition survives concurrent edits.
-- **Undo** through Loro's `UndoManager` feels like normal undo.
-- **`modifiedAt` stamping:** debounced, and without a meta change per keystroke bloating history.
-- **Cost of `loro-crdt` WASM in the renderer:** bundle size, and the load time for a 100k-word draft.
+[`spikes/editor-binding`](../spikes/editor-binding/README.md) passed every scenario against the 100k-word draft:
+- Agent edits merge around the cursor without moving it.
+- Undo reverts only your own edits.
+- Two windows stay in sync, 18 ms apart.
+- The window survives a daemon restart, and typing done while it was down reaches the daemon.
+
+The binding adds about 0.4 ms per keystroke with no dropped frames at 240 Hz, and opening the draft costs about 45 ms of socket, import and editor setup. Composing characters with an input method or compose key while an agent edit lands is still untested.

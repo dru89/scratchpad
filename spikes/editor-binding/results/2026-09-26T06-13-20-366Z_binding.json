@@ -1,0 +1,131 @@
+{
+  "load": {
+    "navToScriptMs": 127.4,
+    "connectedMs": 132,
+    "createDraftMs": 5.8,
+    "openRpcMs": 6.8,
+    "importMs": 12.9,
+    "snapshotBytes": 754583,
+    "createViewMs": 26.1,
+    "navToFirstFrameMs": 275
+  },
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.130 Electron/44.4.5 Safari/537.36",
+  "results": {
+    "bindingOverhead": {
+      "withoutBinding": {
+        "dispatchMs": {
+          "n": 200,
+          "p50": 2.4,
+          "p95": 4.7,
+          "max": 62.7
+        },
+        "frameMs": {
+          "n": 200,
+          "p50": 4.2,
+          "p95": 8.3,
+          "max": 71
+        }
+      },
+      "withBinding": {
+        "dispatchMs": {
+          "n": 200,
+          "p50": 2.8,
+          "p95": 3.8,
+          "max": 25.2
+        },
+        "frameMs": {
+          "n": 200,
+          "p50": 4.2,
+          "p95": 4.3,
+          "max": 25
+        }
+      },
+      "converged": true,
+      "daemonChars": 678811,
+      "windowChars": 678811
+    },
+    "cursorStability": {
+      "contextPreserved": true,
+      "headMovedBy": 45,
+      "expectedMove": 45,
+      "insertLatencyMs": 31.2,
+      "setTextLatencyMs": 48.9,
+      "daemonSetTextEditMs": 1.41,
+      "setTextUpdateBytes": 183,
+      "converged": true,
+      "daemonChars": 678868,
+      "windowChars": 678868
+    },
+    "undoIsolation": {
+      "undo": {
+        "exactlyTypingRemoved": true,
+        "typedRemoved": true,
+        "agentTextKept": true,
+        "cursorRestoredToStart": true,
+        "cursorAt": 272362,
+        "expectedCursor": 272362
+      },
+      "redo": {
+        "typedBack": true,
+        "agentTextKept": true,
+        "cursorAtEndOfRedo": true
+      },
+      "converged": true,
+      "daemonChars": 678907,
+      "windowChars": 678907
+    },
+    "undoAfterAgentEditedYourText": {
+      "leftover": "\"rash server.OKAPI\\n\\nSch\"",
+      "typedGone": true,
+      "converged": true,
+      "daemonChars": 678912,
+      "windowChars": 678912
+    },
+    "typingDuringAgentStorm": {
+      "typedContiguous": true,
+      "agentEditsReceived": 30,
+      "daemonEditMs": {
+        "n": 30,
+        "p50": 3.85,
+        "p95": 10.28,
+        "max": 12.52
+      },
+      "converged": true,
+      "daemonChars": 679043,
+      "windowChars": 679043
+    },
+    "secondWindow": {
+      "windowToWindowMs": {
+        "n": 20,
+        "p50": 17.7,
+        "p95": 21.4,
+        "max": 21.4
+      },
+      "observerMatches": true,
+      "converged": true,
+      "daemonChars": 679273,
+      "windowChars": 679273
+    },
+    "daemonRestart": {
+      "reconnectMs": 337.4,
+      "typedReachedDaemon": true,
+      "converged": true,
+      "daemonChars": 679301,
+      "windowChars": 679301
+    },
+    "sessionStats": {
+      "pushes": 375,
+      "pushBytes": 34188,
+      "remoteUpdates": 34,
+      "remoteBytes": 5220,
+      "lastRemoteAt": 9178.10000000149,
+      "stamps": 1
+    },
+    "daemonStats": {
+      "peers": 2,
+      "snapshotBytes": 757482,
+      "subscribers": 1,
+      "textChars": 679301
+    }
+  }
+}

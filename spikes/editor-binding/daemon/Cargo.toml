@@ -1,0 +1,10 @@
+[package]
+name = "spike-daemon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+base64 = "0.23.1"
+loro = "1.16"
+serde_json = "1.0.151"
+tokio = { version = "1.53.1", features = ["full"] }
