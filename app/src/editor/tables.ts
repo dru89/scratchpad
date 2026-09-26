@@ -91,7 +91,7 @@ function inline(text: string): string {
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '<a>$1</a>');
 }
 
-const ROW_PX = 31;
+const ROW_PX = 34;
 
 class TableWidget extends WidgetType {
   constructor(
@@ -106,7 +106,7 @@ class TableWidget extends WidgetType {
   }
 
   get estimatedHeight() {
-    return (this.model.rows.length + 1) * ROW_PX + 12;
+    return (this.model.rows.length + 1) * ROW_PX + 8;
   }
 
   toDOM(view: EditorView) {

@@ -4,7 +4,8 @@
 
 import { bridge, type DraftState, type DraftSummary } from './bridge';
 import type { DraftController } from './controller';
-import { escapeHtml, relativeTime } from './format';
+import { escapeHtml, kbd, markMatches, relativeTime, searchTerms } from './format';
+import { icon } from './icons';
 import type { Rpc } from './rpc';
 
 const TABS: { state: DraftState; label: string }[] = [
@@ -13,11 +14,28 @@ const TABS: { state: DraftState; label: string }[] = [
   { state: 'trashed', label: 'Trash' },
 ];
 
+const label = (state: DraftState) => TABS.find((t) => t.state === state)!.label;
+
+/** What an empty list says: a fact, and how to change it. */
+function emptyState(tab: DraftState, query: string): string {
+  if (query) {
+    return `<div class="empty"><p class="empty-title">No drafts match “${escapeHtml(query)}”</p><p class="empty-hint">${kbd('Esc')} clears the filter</p></div>`;
+  }
+  const [iconName, title, hint] =
+    tab === 'archived'
+      ? (['archive', 'Nothing archived', `${kbd('Mod+Shift+A')} files a draft here<br>when you’re done with it`] as const)
+      : tab === 'trashed'
+        ? (['trash', 'Trash is empty', 'Drafts here are deleted<br>after 30 days'] as const)
+        : (['inbox', 'Nothing in the Inbox', `${kbd('Mod+N')} starts a draft`] as const);
+  return `<div class="empty">${icon(iconName, 22)}<p class="empty-title">${title}</p><p class="empty-hint">${hint}</p></div>`;
+}
+
 export class Sidebar {
   tab: DraftState = 'inbox';
   private query = '';
   private items: DraftSummary[] = [];
   private listEl: HTMLElement;
+  private metaEl: HTMLElement;
   private filterEl: HTMLInputElement;
   private tabsEl: HTMLElement;
   private renderTimer: ReturnType<typeof setTimeout> | null = null;
@@ -30,10 +48,16 @@ export class Sidebar {
   ) {
     root.innerHTML = `
       <div class="tabs" role="tablist"></div>
-      <input class="filter" type="search" placeholder="Filter" spellcheck="false" aria-label="Filter drafts">
+      <label class="filter-field">
+        ${icon('search', 15)}
+        <input class="filter" type="search" placeholder="Filter Inbox" spellcheck="false" aria-label="Filter drafts">
+        ${kbd('Esc')}
+      </label>
+      <div class="list-meta" hidden></div>
       <div class="list" role="listbox" tabindex="-1"></div>`;
     this.tabsEl = root.querySelector('.tabs')!;
     this.filterEl = root.querySelector('.filter')!;
+    this.metaEl = root.querySelector('.list-meta')!;
     this.listEl = root.querySelector('.list')!;
 
     this.tabsEl.addEventListener('click', (e) => {
@@ -160,8 +184,9 @@ export class Sidebar {
   private renderTabs() {
     this.tabsEl.innerHTML = TABS.map(
       (t, n) =>
-        `<button class="tab${t.state === this.tab ? ' active' : ''}" data-tab="${t.state}" role="tab" title="${t.label} (Ctrl+${n + 1})">${t.label}</button>`,
+        `<button class="tab${t.state === this.tab ? ' active' : ''}" data-tab="${t.state}" role="tab" aria-selected="${t.state === this.tab}" title="${t.label} (Ctrl+${n + 1})">${t.label}</button>`,
     ).join('');
+    this.filterEl.placeholder = `Filter ${label(this.tab)}`;
   }
 
   private renderSoon() {
@@ -172,18 +197,20 @@ export class Sidebar {
     if (this.renderTimer) clearTimeout(this.renderTimer);
     this.renderTimer = null;
     const now = Date.now();
+    this.metaEl.hidden = !this.query || !this.items.length;
+    this.metaEl.textContent = `${this.items.length} in ${label(this.tab)}`;
     if (!this.items.length) {
-      const empty = this.query ? 'No matches' : this.tab === 'inbox' ? 'Nothing here yet' : `Nothing in ${this.tab === 'trashed' ? 'the Trash' : 'the Archive'}`;
-      this.listEl.innerHTML = `<div class="empty">${empty}</div>`;
+      this.listEl.innerHTML = emptyState(this.tab, this.query);
       return;
     }
+    const terms = searchTerms(this.query);
     const focused = (document.activeElement as HTMLElement | null)?.dataset?.id;
     this.listEl.innerHTML = this.items
       .map((d) => {
         const selected = d.id === this.controller.draftId ? ' selected' : '';
-        const snippet = d.snippet ? `<div class="item-snippet">${escapeHtml(d.snippet)}</div>` : '';
+        const snippet = d.snippet ? `<div class="item-snippet">${markMatches(d.snippet, terms)}</div>` : '';
         return `<div class="item${selected}" data-id="${d.id}" role="option" tabindex="0">
-          <div class="item-row"><span class="item-title">${escapeHtml(d.title)}</span><span class="item-time">${relativeTime(d.modifiedAt, now)}</span></div>
+          <div class="item-row"><span class="item-title">${markMatches(d.title, terms)}</span><span class="item-time">${relativeTime(d.modifiedAt, now)}</span></div>
           ${snippet}
         </div>`;
       })

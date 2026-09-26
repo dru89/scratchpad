@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localTitle, relativeTime } from './format';
+import { kbd, localTitle, markMatches, relativeTime, searchTerms } from './format';
 import { shouldRollOver } from './idle';
 
 describe('localTitle', () => {
@@ -34,6 +34,29 @@ describe('relativeTime', () => {
     expect(relativeTime(now - 20_000, now)).toBe('now');
     expect(relativeTime(now - 5 * 60_000, now)).toBe('5m');
     expect(relativeTime(now - 3 * 3_600_000, now)).toBe('3h');
+  });
+});
+
+describe('searchTerms', () => {
+  it('keeps quoted phrases whole, like the daemon', () => {
+    expect(searchTerms('sync "rich copy" table')).toEqual(['sync', 'rich copy', 'table']);
+    expect(searchTerms('  "unterminated phrase')).toEqual(['unterminated phrase']);
+    expect(searchTerms('   ')).toEqual([]);
+  });
+});
+
+describe('markMatches', () => {
+  it('marks every term, ignoring case, and escapes the rest', () => {
+    expect(markMatches('Sync <b> and resync', ['sync'])).toBe('<mark>Sync</mark> &lt;b&gt; and re<mark>sync</mark>');
+    expect(markMatches('rich copy works', ['rich copy', 'copy'])).toBe('<mark>rich copy</mark> works');
+    expect(markMatches('nothing here', [])).toBe('nothing here');
+  });
+});
+
+describe('kbd', () => {
+  it('makes one keycap per key, with glyphs for Enter and Backspace', () => {
+    expect(kbd('Mod+Enter')).toBe('<kbd class="kbd">Ctrl</kbd><kbd class="kbd">↵</kbd>');
+    expect(kbd('Shift+Backspace')).toBe('<kbd class="kbd">Shift</kbd><kbd class="kbd">⌫</kbd>');
   });
 });
 

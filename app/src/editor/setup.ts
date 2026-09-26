@@ -7,40 +7,46 @@ import { search, searchKeymap } from '@codemirror/search';
 import type { Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap, placeholder, type ViewUpdate } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
+import { createFindPanel, openReplace } from './find';
 import { livePreview } from './livepreview';
 import { tables } from './tables';
 
+// Classes rather than inline styles, so style.css owns the look. Heading
+// weight and quote color come from the line classes in livepreview.ts.
 const highlight = HighlightStyle.define([
-  { tag: [t.heading1, t.heading2], fontWeight: '700' },
-  { tag: [t.heading3, t.heading4, t.heading5, t.heading6], fontWeight: '600' },
-  { tag: t.strong, fontWeight: '700' },
-  { tag: t.emphasis, fontStyle: 'italic' },
-  { tag: t.strikethrough, textDecoration: 'line-through' },
-  { tag: t.monospace, fontFamily: 'var(--mono)', fontSize: '0.9em' },
-  { tag: [t.url, t.processingInstruction], color: 'var(--muted)' },
-  { tag: t.link, color: 'var(--accent)' },
-  { tag: t.quote, color: 'var(--quote)' },
+  { tag: t.strong, class: 'cm-strong' },
+  { tag: t.emphasis, class: 'cm-em' },
+  { tag: t.strikethrough, class: 'cm-strike' },
+  { tag: t.monospace, class: 'cm-inline-code' },
+  { tag: t.link, class: 'cm-link' },
+  { tag: t.url, class: 'cm-url' },
+  // Revealed syntax: #, **, >, list numbers, link brackets.
+  { tag: t.processingInstruction, class: 'cm-mark' },
 ]);
 
+// What has to beat CodeMirror's base theme lives here; the markdown styles
+// are in style.css.
 const theme = EditorView.theme({
-  '&': { height: '100%', fontSize: 'var(--editor-size)', backgroundColor: 'var(--bg)', color: 'var(--fg)' },
+  '&': { height: '100%', fontSize: 'var(--editor-size)', backgroundColor: 'var(--paper)', color: 'var(--ink)' },
   '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { fontFamily: 'var(--sans)', lineHeight: '1.6', overflow: 'auto' },
-  '.cm-content': { maxWidth: '46em', margin: '0 auto', padding: 'var(--editor-pad)', caretColor: 'var(--accent)' },
+  '.cm-scroller': { fontFamily: 'var(--font-editor)', lineHeight: '1.6', overflow: 'auto' },
+  '.cm-content': { maxWidth: 'var(--measure)', margin: '0 auto', padding: 'var(--editor-pad)', caretColor: 'var(--accent)' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground': {
     background: 'var(--selection)',
   },
-  '.cm-placeholder': { color: 'var(--muted)' },
-  '.cm-panels': { backgroundColor: 'var(--panel)', color: 'var(--fg)', borderColor: 'var(--border)' },
-  '.cm-searchMatch': { backgroundColor: 'var(--match)' },
+  '.cm-placeholder': { color: 'var(--ink-3)' },
+  '.cm-panels': { backgroundColor: 'var(--paper)', color: 'var(--ink)' },
+  '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--line)' },
+  '.cm-searchMatch': { backgroundColor: 'var(--highlight)', borderRadius: '2px' },
+  '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'var(--highlight-strong)', color: 'var(--on-highlight-strong)' },
 });
 
 export function editorExtensions(opts: { placeholder: string; onUpdate: (u: ViewUpdate) => void }): Extension[] {
   return [
     drawSelection(),
-    search({ top: true }),
-    keymap.of([...searchKeymap, ...defaultKeymap]),
+    search({ top: true, createPanel: createFindPanel }),
+    keymap.of([{ key: 'Mod-h', run: openReplace, scope: 'editor search-panel' }, ...searchKeymap, ...defaultKeymap]),
     markdown({ base: markdownLanguage }),
     syntaxHighlighting(highlight),
     theme,

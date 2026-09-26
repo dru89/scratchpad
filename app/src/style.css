@@ -1,46 +1,166 @@
+/* scratchpad's look. docs/visual-design.md says why it looks this way and
+   how to extend it; the tokens below are its palette, type and measures. */
+
+/* ---- fonts: Atkinson Hyperlegible Next and Mono (OFL, see fonts/) --------- */
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: block;
+  src: url('./fonts/AtkinsonHyperlegibleNext-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: block;
+  src: url('./fonts/AtkinsonHyperlegibleNext-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: italic;
+  font-weight: 200 800;
+  font-display: block;
+  src: url('./fonts/AtkinsonHyperlegibleNext-Italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: italic;
+  font-weight: 200 800;
+  font-display: block;
+  src: url('./fonts/AtkinsonHyperlegibleNext-Italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Mono';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: block;
+  src: url('./fonts/AtkinsonHyperlegibleMono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Mono';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: block;
+  src: url('./fonts/AtkinsonHyperlegibleMono-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ---- tokens --------------------------------------------------------------- */
+
 :root {
-  --bg: #fbfaf7;
-  --side: #f3f1ec;
-  --panel: #f6f4ef;
-  --fg: #1f1e1c;
-  --muted: #8e8a83;
-  --faint: #b8b3aa;
-  --border: #e4e0d8;
-  --hover: #ebe8e1;
-  --selected: #e2ddd3;
-  --accent: #2f62d9;
-  --quote: #5f5b55;
-  --code-bg: #f1eee8;
-  --selection: rgba(47, 98, 217, 0.18);
-  --match: rgba(255, 196, 0, 0.35);
-  --warn: #b5462d;
-  --sans: system-ui, -apple-system, 'Segoe UI', 'Noto Sans', sans-serif;
-  --mono: ui-monospace, 'JetBrains Mono', 'SF Mono', 'Noto Sans Mono', monospace;
+  color-scheme: light dark;
+
+  /* color, light */
+  --paper: #fdfdfc;
+  --paper-side: #f5f5f3;
+  --paper-sunk: #f1f1ef;
+  --raised: #ffffff;
+  --hover: rgba(24, 24, 27, 0.05);
+  --selected: rgba(24, 24, 27, 0.085);
+  --ink: #1d1d1f;
+  --ink-2: #48484c;
+  --ink-3: #5f5f65;
+  --ink-4: #838389;
+  --line: #e7e7e4;
+  --line-strong: #d5d5d1;
+  --accent: #2b5bd3;
+  --accent-soft: rgba(43, 91, 211, 0.11);
+  --on-accent: #ffffff;
+  --selection: rgba(43, 91, 211, 0.18);
+  --link-underline: rgba(43, 91, 211, 0.4);
+  --highlight: rgba(250, 200, 20, 0.34);
+  --highlight-strong: #f5cd48;
+  --on-highlight-strong: #1d1d1f;
+  --clay: #b3402a;
+  --clay-soft: #fbeae6;
+  --toast-bg: #1d1d1f;
+  --toast-ink: #fafafa;
+  --scrim: rgba(20, 20, 22, 0.16);
+  --scroll-thumb: rgba(24, 24, 27, 0.2);
+  --scroll-thumb-hover: rgba(24, 24, 27, 0.34);
+  --shadow-overlay: 0 2px 6px rgba(20, 20, 22, 0.06), 0 16px 40px rgba(20, 20, 22, 0.14);
+  --shadow-toast: 0 4px 14px rgba(20, 20, 22, 0.18);
+  --focus-ring: 0 0 0 2px #2b5bd3;
+  --focus-ring-inset: inset 0 0 0 2px #2b5bd3;
+
+  /* space, shape, size, type */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --rhythm-gap: 0.75em;
+  --rhythm-heading: 0.6em;
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  --sidebar-width: 272px;
+  --toolbar-height: 40px;
+  --tool-size: 30px;
+  --icon-size: 18px;
+  --measure: 40em;
+  --switcher-width: 600px;
+  --font-ui: system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif;
+  --font-editor: "Atkinson Hyperlegible Next", system-ui, "Noto Sans", sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, "JetBrains Mono", "Noto Sans Mono", monospace;
+
   --editor-size: 16px;
-  --editor-pad: 36px 28px 40vh;
-  color-scheme: light;
+  --editor-pad: var(--space-10) var(--space-8) 40vh;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1c1c1e;
-    --side: #212124;
-    --panel: #242427;
-    --fg: #e6e3dd;
-    --muted: #8b877f;
-    --faint: #5d5a55;
-    --border: #323236;
-    --hover: #2a2a2e;
-    --selected: #34343a;
-    --accent: #86a8ff;
-    --quote: #aaa59c;
-    --code-bg: #28282b;
-    --selection: rgba(134, 168, 255, 0.24);
-    --match: rgba(255, 196, 0, 0.25);
-    --warn: #f08a6c;
-    color-scheme: dark;
+    --paper: #1c1c1e;
+    --paper-side: #222224;
+    --paper-sunk: #27272a;
+    --raised: #2b2b2e;
+    --hover: rgba(255, 255, 255, 0.05);
+    --selected: rgba(255, 255, 255, 0.085);
+    --ink: #ececee;
+    --ink-2: #c4c4c9;
+    --ink-3: #ababb1;
+    --ink-4: #76767c;
+    --line: #333336;
+    --line-strong: #46464a;
+    --accent: #8eaeff;
+    --accent-soft: rgba(142, 174, 255, 0.16);
+    --on-accent: #14161c;
+    --selection: rgba(142, 174, 255, 0.26);
+    --link-underline: rgba(142, 174, 255, 0.45);
+    --highlight: rgba(222, 184, 58, 0.3);
+    --highlight-strong: #dcb546;
+    --on-highlight-strong: #1c1c1e;
+    --clay: #f09078;
+    --clay-soft: #3d2622;
+    --toast-bg: #3a3a3e;
+    --toast-ink: #ececee;
+    --scrim: rgba(0, 0, 0, 0.42);
+    --scroll-thumb: rgba(255, 255, 255, 0.18);
+    --scroll-thumb-hover: rgba(255, 255, 255, 0.32);
+    --shadow-overlay: 0 2px 6px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.5);
+    --shadow-toast: 0 4px 14px rgba(0, 0, 0, 0.5);
+    --focus-ring: 0 0 0 2px #8eaeff;
+    --focus-ring-inset: inset 0 0 0 2px #8eaeff;
   }
 }
+
+/* ---- base ----------------------------------------------------------------- */
 
 * {
   box-sizing: border-box;
@@ -50,10 +170,10 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
-  color: var(--fg);
-  font: 14px/1.4 var(--sans);
   overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font: 14px/1.4 var(--font-ui);
 }
 
 button {
@@ -61,71 +181,340 @@ button {
   color: inherit;
 }
 
-#app {
+::selection {
+  background: var(--selection);
+}
+
+.app {
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   height: 100vh;
 }
 
-body:not(.kind-main) #app,
-body.no-sidebar #app {
+body:not(.kind-main) .app,
+body.no-sidebar .app {
   grid-template-columns: minmax(0, 1fr);
 }
 
-body.no-sidebar #sidebar {
+body.no-sidebar .sidebar {
   display: none;
 }
 
-/* ---- sidebar ---------------------------------------------------------- */
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 
-#sidebar {
+/* ---- toolbar -------------------------------------------------------------- */
+
+.toolbar {
+  container-type: inline-size;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  height: var(--toolbar-height);
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.toolbar-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+/* A tool button: 30px square around an 18px icon. Toggles carry aria-pressed. */
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: var(--tool-size);
+  height: var(--tool-size);
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--ink-4);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tool svg {
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+}
+
+.tool:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.tool:active:not(:disabled) {
+  background: var(--selected);
+}
+
+.tool:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Pressed: the accent fill and color, and the part of the icon marked .i-fill
+   fills in, so state reads by shape as well as color. Hover leaves it as is. */
+.tool[aria-pressed='true'],
+.tool[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tool[aria-pressed='true'] .i-fill {
+  fill: currentColor;
+}
+
+.tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tool-label {
+  padding-right: 2px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+/* ---- buttons and keycaps -------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn svg {
+  width: 15px;
+  height: 15px;
+  margin-left: -2px;
+}
+
+.btn:hover {
+  background: linear-gradient(var(--hover), var(--hover)), var(--raised);
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.btn .kbd {
+  margin-left: 2px;
+}
+
+.btn .kbd + .kbd {
+  margin-left: 0;
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--paper-sunk);
+  box-shadow: inset 0 0 0 1px var(--line), inset 0 -1px 0 var(--line-strong);
+  color: var(--ink-3);
+  font: 500 11px/16px var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.kbd + .kbd {
+  margin-left: 2px;
+}
+
+/* ---- badges --------------------------------------------------------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  background: var(--paper-sunk);
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.badge svg {
+  width: 13px;
+  height: 13px;
+  margin-left: -2px;
+}
+
+.badge.warn {
+  background: var(--clay-soft);
+  color: var(--clay);
+}
+
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  margin-left: -1px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+
+/* ---- sidebar -------------------------------------------------------------- */
+
+.sidebar {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--side);
-  border-right: 1px solid var(--border);
+  background: var(--paper-side);
+  border-right: 1px solid var(--line);
 }
 
 .tabs {
   display: flex;
   gap: 2px;
   margin: 10px 10px 8px;
-  padding: 2px;
-  background: var(--hover);
-  border-radius: 8px;
 }
 
 .tab {
   flex: 1;
-  padding: 5px 0;
+  height: 28px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: none;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
 }
 
+.tab:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .tab.active {
-  background: var(--bg);
-  color: var(--fg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  background: var(--selected);
+  color: var(--ink);
+}
+
+.filter-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 0 10px 8px;
+}
+
+.filter-field > svg {
+  position: absolute;
+  left: 9px;
+  width: 15px;
+  height: 15px;
+  color: var(--ink-4);
+  pointer-events: none;
 }
 
 .filter {
-  margin: 0 10px 8px;
-  padding: 6px 9px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--bg);
-  color: var(--fg);
-  font: inherit;
+  width: 100%;
+  height: 30px;
+  padding: 0 40px 0 30px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--hover);
+  color: var(--ink);
+  font: 13px/18px var(--font-ui);
   outline: none;
+}
+
+.filter::placeholder {
+  color: var(--ink-3);
 }
 
 .filter:focus {
   border-color: var(--accent);
+  background: var(--raised);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.filter-field .kbd {
+  position: absolute;
+  right: 7px;
+}
+
+/* The Esc hint shows only while there's a query to clear. */
+.filter:placeholder-shown ~ .kbd {
+  display: none;
+}
+
+/* Escape clears these; the native clear button just adds noise. */
+input[type='search']::-webkit-search-cancel-button {
+  display: none;
+}
+
+.list-meta {
+  padding: 0 16px 6px;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .list {
@@ -138,10 +527,15 @@ body.no-sidebar #sidebar {
 
 .item,
 .switcher-item {
-  padding: 7px 9px;
-  border-radius: 7px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
   cursor: default;
   outline: none;
+}
+
+.item + .item,
+.switcher-item + .switcher-item {
+  margin-top: 1px;
 }
 
 .item:hover,
@@ -155,13 +549,13 @@ body.no-sidebar #sidebar {
 }
 
 .item:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--accent);
+  box-shadow: var(--focus-ring-inset);
 }
 
 .item-row {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .item-title {
@@ -170,244 +564,715 @@ body.no-sidebar #sidebar {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--ink);
+  font-size: 14px;
   font-weight: 500;
+  line-height: 20px;
 }
 
 .item-time {
   flex: none;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 12px;
+  line-height: 16px;
   font-variant-numeric: tabular-nums;
 }
 
 .item-snippet {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 12.5px;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  margin-top: 2px;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
 }
 
+.item mark,
+.switcher-item mark {
+  margin: 0 -1px;
+  padding: 0 1px;
+  border-radius: var(--radius-xs);
+  background: var(--highlight);
+  color: var(--ink);
+}
+
+.item-tag {
+  flex: none;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--paper-sunk);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+/* ---- empty states --------------------------------------------------------- */
+
 .empty {
-  padding: 24px 12px;
-  color: var(--muted);
+  padding: 36px 20px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  line-height: 18px;
   text-align: center;
 }
 
-/* ---- toolbar and editor --------------------------------------------- */
+.empty svg {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 8px;
+  color: var(--ink-4);
+}
 
-#pane {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+.empty-title {
+  margin: 0 0 4px;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.empty-hint {
+  margin: 0;
+}
+
+.empty-hint .kbd {
+  margin-right: 1px;
+  vertical-align: 1px;
+}
+
+/* ---- the editor ------------------------------------------------------------
+   CodeMirror 6. Structure, caret, selection and search colors are in
+   EditorView.theme (editor/setup.ts); the markdown styles are here. CodeMirror
+   mounts its own styles after this file, so rules for line classes are written
+   .cm-editor .cm-line.cm-x to outrank its default line padding. Use padding,
+   never margins, on lines: CodeMirror measures line boxes. */
+
+.editor {
+  flex: 1;
   min-height: 0;
 }
 
-#toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 42px;
-  flex: none;
-  padding: 0 8px 0 10px;
-  border-bottom: 1px solid var(--border);
+/* Rhythm. A blank line the cursor isn't on is rhythm-gap tall, not a full
+   line; h1 to h3 add rhythm-heading above, so a heading sits with what
+   follows it. */
+.cm-editor .cm-line.cm-blank {
+  line-height: var(--rhythm-gap);
 }
 
-.toolbar-title {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 13px;
+.cm-editor .cm-line.cm-h1,
+.cm-editor .cm-line.cm-h2,
+.cm-editor .cm-line.cm-h3,
+.cm-editor .cm-line.cm-h4 {
+  font-weight: 600;
 }
 
-.title-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.cm-editor .cm-line.cm-h1 {
+  padding-top: var(--rhythm-heading);
+  font-size: 1.5em;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
 }
 
-.badge {
-  flex: none;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--hover);
-  color: var(--muted);
-  font-size: 11.5px;
+.cm-editor .cm-content > .cm-line.cm-h1:first-child {
+  padding-top: 0;
 }
 
-.badge.warn {
-  color: var(--warn);
+.cm-editor .cm-line.cm-h2 {
+  padding-top: var(--rhythm-heading);
+  font-size: 1.25em;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
 }
 
-.tools {
-  display: flex;
-  gap: 2px;
+.cm-editor .cm-line.cm-h3 {
+  padding-top: var(--rhythm-heading);
+  font-size: 1.1em;
+  line-height: 1.4;
 }
 
-.tool {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 7px;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
+.cm-editor .cm-line.cm-h4 {
+  font-size: 1em;
 }
 
-.tool:hover:not(:disabled) {
-  background: var(--hover);
-  color: var(--fg);
+.cm-editor .cm-line.cm-h5 {
+  color: var(--ink-2);
+  font-size: 1em;
+  font-weight: 550;
 }
 
-.tool.active {
+.cm-editor .cm-line.cm-h6 {
+  color: var(--ink-3);
+  font-size: 0.875em;
+  font-weight: 550;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Inline styles, from the HighlightStyle in editor/setup.ts. */
+.cm-strong {
+  font-weight: 700;
+}
+
+.cm-em {
+  font-style: italic;
+}
+
+.cm-strike {
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-3);
+}
+
+/* Revealed syntax (#, **, >, list numbers) and link URLs. */
+.cm-mark,
+.cm-url {
+  color: var(--ink-3);
+}
+
+.cm-link {
   color: var(--accent);
 }
 
-.tool:disabled {
-  opacity: 0.35;
-  cursor: default;
+.cm-inline-code {
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-xs);
+  background: var(--paper-sunk);
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
-
-#editor {
-  flex: 1;
-  min-height: 0;
-}
-
-body.kind-capture {
-  --editor-size: 15px;
-  --editor-pad: 16px 18px 30vh;
-}
-
-body.kind-capture .cm-content {
-  max-width: none !important;
-}
-
-/* Live preview (editor/livepreview.ts, editor/tables.ts) */
-
-.cm-h1 { font-size: 1.75em; }
-.cm-h2 { font-size: 1.4em; }
-.cm-h3 { font-size: 1.18em; }
-.cm-h4, .cm-h5, .cm-h6 { font-size: 1.05em; }
 
 .cm-link-text {
   color: var(--accent);
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  text-decoration-color: var(--link-underline);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
 }
 
+/* The dot gets a fixed box, so there's room between it and the text and
+   bullet text lines up with numbered text. Nested items (.cm-list-2 to -4)
+   step in by that same box per level, whatever indentation they were typed
+   with, which puts a nested dot under its parent's text. */
 .cm-bullet {
-  color: var(--muted);
+  display: inline-block;
+  width: 0.6em;
+  color: var(--ink-4);
+  font-weight: 700;
+}
+
+.cm-editor .cm-line.cm-list-2 {
+  padding-left: calc(6px + 0.85em);
+}
+
+.cm-editor .cm-line.cm-list-3 {
+  padding-left: calc(6px + 1.7em);
+}
+
+.cm-editor .cm-line.cm-list-4 {
+  padding-left: calc(6px + 2.55em);
+}
+
+/* Task lists: a display-only box in place of "- [ ]", and done items muted. */
+.cm-task {
+  position: relative;
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.1em;
+  border: 1.5px solid var(--ink-4);
+  border-radius: var(--radius-xs);
+  vertical-align: -0.08em;
+}
+
+.cm-task.is-done {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.cm-task.is-done::after {
+  content: '';
+  position: absolute;
+  left: 0.22em;
+  top: 0.04em;
+  width: 0.2em;
+  height: 0.42em;
+  border: solid var(--on-accent);
+  border-width: 0 0.11em 0.11em 0;
+  transform: rotate(45deg);
+}
+
+.cm-editor .cm-line.cm-task-done {
+  color: var(--ink-3);
 }
 
 .cm-rule {
   display: inline-block;
   width: 100%;
-  border-top: 1px solid var(--border);
+  height: 0;
+  border-top: 1px solid var(--line-strong);
   vertical-align: middle;
 }
 
-.cm-quote {
-  border-left: 3px solid var(--border);
-  padding-left: 14px !important;
+/* Quotes: the > is hidden off the cursor's line, and the bar is a
+   background, so revealing the > doesn't move it. */
+.cm-editor .cm-line.cm-quote {
+  padding-left: calc(6px + 1.35em);
+  background: linear-gradient(var(--ink-4), var(--ink-4)) 6px 0 / 2px 100% no-repeat;
+  color: var(--ink-2);
 }
 
-.cm-codeblock {
-  background: var(--code-bg);
-  font-family: var(--mono);
-  font-size: 0.88em;
+.cm-editor .cm-line.cm-quote-first {
+  padding-top: 0.3em;
 }
 
+.cm-editor .cm-line.cm-quote-last {
+  padding-bottom: 0.3em;
+}
+
+.cm-editor .cm-line.cm-codeblock {
+  padding-left: calc(6px + 0.9em);
+  padding-right: 0.9em;
+  background: var(--paper-sunk);
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+.cm-editor .cm-line.cm-codeblock-first {
+  padding-top: 0.45em;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.cm-editor .cm-line.cm-codeblock-last {
+  padding-bottom: 0.45em;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+/* Code text is monospace-tagged too; inside a block it's plain. */
+.cm-codeblock .cm-inline-code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+/* Tables: rules between rows, none between columns, aligned to the text edge. */
 .cm-table-wrap {
   overflow-x: auto;
-  padding: 6px 0;
+  padding: 2px 2px 6px 6px;
 }
 
 .cm-table-wrap table {
   border-collapse: collapse;
-  font-size: 0.92em;
+  font-size: 0.9375em;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
 }
 
 .cm-table-wrap th,
 .cm-table-wrap td {
-  border: 1px solid var(--border);
-  padding: 3px 9px;
+  padding: 5px 24px 5px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
   cursor: text;
 }
 
 .cm-table-wrap th {
-  background: var(--code-bg);
+  border-bottom: 1.5px solid var(--line-strong);
   font-weight: 600;
 }
 
+.cm-table-wrap tr:last-child td {
+  border-bottom: 0;
+}
+
+.cm-table-wrap th:last-child,
+.cm-table-wrap td:last-child {
+  padding-right: 0;
+}
+
 .cm-table-wrap code {
-  font-family: var(--mono);
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-xs);
+  background: var(--paper-sunk);
+  font-family: var(--font-mono);
   font-size: 0.9em;
 }
 
-/* ---- switcher and toast --------------------------------------------- */
+.cm-table-wrap a {
+  color: var(--accent);
+}
+
+/* ---- find in draft (editor/find.ts) --------------------------------------- */
+
+.find {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px 6px 10px;
+  font: 13px/18px var(--font-ui);
+}
+
+.find-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.find-row[hidden] {
+  display: none;
+}
+
+.find-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 320px;
+  min-width: 140px;
+  height: 28px;
+  margin-right: 4px;
+  padding: 0 8px 0 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+
+.find-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.find-field > svg {
+  position: absolute;
+  left: 8px;
+  width: 14px;
+  height: 14px;
+  color: var(--ink-4);
+}
+
+.find-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+
+.find-field input::placeholder {
+  color: var(--ink-3);
+}
+
+.find-count {
+  flex: none;
+  margin-left: 8px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.find-count.none {
+  color: var(--clay);
+}
+
+.find-opt {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-3);
+  font: 600 12px/16px var(--font-mono);
+  cursor: pointer;
+}
+
+.find-opt:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.find-opt:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.find-opt[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.find-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--line);
+}
+
+.find-spacer {
+  flex: 1;
+}
+
+.find .tool {
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.find .tool svg {
+  width: 16px;
+  height: 16px;
+}
+
+.find .btn {
+  height: 26px;
+  margin-left: 4px;
+}
+
+/* ---- quick switcher ------------------------------------------------------- */
 
 .switcher {
   position: fixed;
   inset: 0;
   z-index: 10;
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.switcher[hidden],
-#toast[hidden] {
-  display: none;
+  background: var(--scrim);
+  animation: sp-fade 120ms ease-out;
 }
 
 .switcher-box {
-  width: min(560px, calc(100vw - 32px));
+  width: min(var(--switcher-width), calc(100% - 32px));
   margin: 12vh auto 0;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
   overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  box-shadow: var(--shadow-overlay);
+  animation: sp-pop 140ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.switcher-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+}
+
+.switcher-field > svg {
+  position: absolute;
+  left: 16px;
+  width: 18px;
+  height: 18px;
+  color: var(--ink-4);
 }
 
 .switcher-box input {
   width: 100%;
-  padding: 13px 16px;
+  height: 50px;
+  padding: 0 16px 0 44px;
   border: 0;
-  border-bottom: 1px solid var(--border);
   background: none;
-  color: var(--fg);
-  font: 16px var(--sans);
+  color: var(--ink);
+  font: 15px/22px var(--font-ui);
   outline: none;
 }
 
+.switcher-box input::placeholder {
+  color: var(--ink-3);
+}
+
 .switcher-list {
-  max-height: min(420px, 60vh);
+  max-height: min(420px, 56vh);
   overflow-y: auto;
   padding: 6px;
 }
 
-#toast {
-  position: fixed;
-  left: 50%;
-  bottom: 20px;
-  z-index: 20;
-  transform: translateX(-50%);
-  padding: 7px 14px;
-  border-radius: 999px;
-  background: var(--fg);
-  color: var(--bg);
-  font-size: 13px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  pointer-events: none;
+.switcher-item {
+  padding: 8px 10px;
 }
 
-/* Escape clears these; the native clear button just adds noise. */
-input[type='search']::-webkit-search-cancel-button {
+.switcher-item .item-snippet {
+  margin-top: 3px;
+}
+
+.switcher-label {
+  padding: 6px 10px 4px;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.switcher-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: 11.5px;
+  line-height: 18px;
+}
+
+.switcher-foot > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.switcher-foot .kbd + .kbd {
+  margin-left: -3px;
+}
+
+/* ---- toast ---------------------------------------------------------------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-4);
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 14px 0 11px;
+  transform: translateX(-50%);
+  border-radius: var(--radius-full);
+  background: var(--toast-bg);
+  color: var(--toast-ink);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  box-shadow: var(--shadow-toast);
+  pointer-events: none;
+  animation: sp-toast 160ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.toast svg {
+  width: 15px;
+  height: 15px;
+  opacity: 0.75;
+}
+
+.switcher[hidden],
+.toast[hidden] {
   display: none;
+}
+
+/* ---- scrollbars ------------------------------------------------------------
+   A thin pill that thickens under the pointer. Don't also set scrollbar-width
+   or scrollbar-color anywhere: Chromium drops these rules when either is set. */
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 3.5px solid transparent;
+  border-radius: 9999px;
+  background: var(--scroll-thumb) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  border-width: 2.5px;
+  background-color: var(--scroll-thumb-hover);
+}
+
+/* ---- draft window --------------------------------------------------------- */
+
+body.kind-draft .toolbar {
+  padding-left: 14px;
+}
+
+/* ---- capture window --------------------------------------------------------
+   The toolbar sits under the editor (main.ts renders it there), drops the
+   title, and labels the toggles that are on. Down to 320px wide nothing is
+   hidden: first the toggle labels drop, then the Done keycap. */
+
+body.kind-capture {
+  --editor-size: 15px;
+  --editor-pad: 14px 18px 30vh;
+  --measure: none;
+}
+
+body.kind-capture .toolbar {
+  padding: 0 6px;
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+body.kind-capture .toolbar-title {
+  gap: 6px;
+}
+
+body.kind-capture .toast {
+  bottom: calc(var(--toolbar-height) + 10px);
+}
+
+@container (max-width: 460px) {
+  .tool-label {
+    display: none;
+  }
+}
+
+@container (max-width: 400px) {
+  .btn .kbd {
+    display: none;
+  }
+
+  .toolbar .tools {
+    gap: 6px;
+  }
+}
+
+/* ---- motion: overlays only; nothing inside the editor animates ------------ */
+
+@keyframes sp-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sp-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.99);
+  }
+}
+
+@keyframes sp-toast {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switcher,
+  .switcher-box,
+  .toast {
+    animation: none;
+  }
 }

@@ -1,6 +1,7 @@
 // Inline live preview: hide markdown syntax outside the element the cursor is
-// in, and style headings, quotes, and code blocks. Only walks the visible
-// ranges, which is what keeps this cheap on a 100k-word document.
+// in, and give lines the classes style.css styles (docs/visual-design.md#the-editor).
+// Only walks the visible ranges, which is what keeps this cheap on a
+// 100k-word document.
 
 import { syntaxTree } from '@codemirror/language';
 import type { EditorState, Range } from '@codemirror/state';
@@ -40,8 +41,26 @@ class RuleWidget extends WidgetType {
   }
 }
 
+/** A task's box. Display only: it doesn't toggle, so the text stays the only source of truth. */
+class TaskWidget extends WidgetType {
+  constructor(readonly done: boolean) {
+    super();
+  }
+  eq(other: TaskWidget) {
+    return other.done === this.done;
+  }
+  toDOM() {
+    const el = document.createElement('span');
+    el.className = this.done ? 'cm-task is-done' : 'cm-task';
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', this.done ? 'Done' : 'To do');
+    return el;
+  }
+}
+
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const rule = Decoration.replace({ widget: new RuleWidget() });
+const tasks = [false, true].map((done) => Decoration.replace({ widget: new TaskWidget(done) }));
 
 export function touches(state: EditorState, from: number, to: number): boolean {
   for (const r of state.selection.ranges) if (r.from <= to && r.to >= from) return true;
@@ -53,11 +72,21 @@ function build(view: EditorView): DecorationSet {
   const doc = state.doc;
   const out: Range<Decoration>[] = [];
   const tree = syntaxTree(state);
+  // Fenced code keeps its blank lines at full height.
+  const code: { from: number; to: number }[] = [];
 
-  const lineRange = (from: number, to: number, cls: string, clipFrom: number, clipTo: number) => {
+  /** Classes every line of a block; with `edges`, also `<cls>-first` and `<cls>-last`. */
+  const lineRange = (from: number, to: number, cls: string, clipFrom: number, clipTo: number, edges = false) => {
+    const first = doc.lineAt(from).number;
+    const last = doc.lineAt(to).number;
     const start = doc.lineAt(Math.max(from, clipFrom)).number;
     const end = doc.lineAt(Math.min(to, clipTo)).number;
-    for (let n = start; n <= end; n++) out.push(lineClass(cls).range(doc.line(n).from));
+    for (let n = start; n <= end; n++) {
+      let c = cls;
+      if (edges && n === first) c += ` ${cls}-first`;
+      if (edges && n === last) c += ` ${cls}-last`;
+      out.push(lineClass(c).range(doc.line(n).from));
+    }
   };
 
   for (const { from, to } of view.visibleRanges) {
@@ -100,24 +129,64 @@ function build(view: EditorView): DecorationSet {
             }
             return;
           }
+          case 'ListItem': {
+            // Nested items step in by a fixed amount per level instead of by
+            // however many spaces they were typed with (style.css .cm-list-N).
+            let depth = 0;
+            for (let p = node.node.parent; p; p = p.parent) if (p.name === 'BulletList' || p.name === 'OrderedList') depth++;
+            if (depth < 2) return;
+            const line = doc.lineAt(node.from);
+            if (touches(state, line.from, line.to) || !/^\s+$/.test(doc.sliceString(line.from, node.from))) return;
+            out.push(lineClass(`cm-list-${Math.min(depth, 4)}`).range(line.from));
+            out.push(hide.range(line.from, node.from));
+            return;
+          }
           case 'ListMark': {
-            if (node.node.parent?.parent?.name !== 'BulletList') return;
+            const item = node.node.parent;
+            if (item?.parent?.name !== 'BulletList' || item.getChild('Task')) return; // TaskMarker handles tasks
             const line = doc.lineAt(node.from);
             if (!touches(state, line.from, line.to)) out.push(bullet.range(node.from, node.to));
+            return;
+          }
+          case 'TaskMarker': {
+            const line = doc.lineAt(node.from);
+            const done = /x/i.test(doc.sliceString(node.from, node.to));
+            if (done) out.push(lineClass('cm-task-done').range(line.from));
+            if (touches(state, line.from, line.to)) return;
+            // In a bullet list the box replaces "- [ ]"; in a numbered one, just "[ ]".
+            const item = node.node.parent?.parent;
+            const mark = item?.parent?.name === 'BulletList' ? item.getChild('ListMark') : null;
+            out.push(tasks[done ? 1 : 0].range(mark ? mark.from : node.from, node.to));
             return;
           }
           case 'HorizontalRule':
             if (!touches(state, node.from, node.to)) out.push(rule.range(node.from, node.to));
             return false;
           case 'Blockquote':
-            lineRange(node.from, node.to, 'cm-quote', from, to);
+            lineRange(node.from, node.to, 'cm-quote', from, to, true);
             return;
+          case 'QuoteMark': {
+            const line = doc.lineAt(node.from);
+            if (touches(state, line.from, line.to)) return;
+            const end = doc.sliceString(node.to, node.to + 1) === ' ' ? node.to + 1 : node.to;
+            out.push(hide.range(node.from, end));
+            return;
+          }
           case 'FencedCode':
-            lineRange(node.from, node.to, 'cm-codeblock', from, to);
+            code.push({ from: node.from, to: node.to });
+            lineRange(node.from, node.to, 'cm-codeblock', from, to, true);
             return false;
         }
       },
     });
+
+    // A blank line the cursor isn't on is rhythm-gap tall, not a full line.
+    for (let n = doc.lineAt(from).number, end = doc.lineAt(to).number; n <= end; n++) {
+      const line = doc.line(n);
+      if (line.length && !/^\s+$/.test(line.text)) continue;
+      if (touches(state, line.from, line.to) || code.some((c) => c.from <= line.from && c.to >= line.to)) continue;
+      out.push(lineClass('cm-blank').range(line.from));
+    }
   }
   return Decoration.set(out, true);
 }

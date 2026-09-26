@@ -52,3 +52,43 @@ export function localTitle(text: string): string {
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+const isMac = typeof navigator !== 'undefined' && navigator.platform.startsWith('Mac');
+const KEY_GLYPHS: Record<string, string> = { Mod: isMac ? '⌘' : 'Ctrl', Enter: '↵', Backspace: '⌫', Up: '↑', Down: '↓' };
+
+/** Keycaps, one per key: kbd('Mod+Shift+A'). Mod is Ctrl, or ⌘ on macOS. */
+export function kbd(keys: string): string {
+  return keys
+    .split('+')
+    .map((k) => `<kbd class="kbd">${escapeHtml(KEY_GLYPHS[k] ?? k)}</kbd>`)
+    .join('');
+}
+
+/** The words and "quoted phrases" of a search, the way the daemon splits them. */
+export function searchTerms(query: string): string[] {
+  const terms: string[] = [];
+  for (const m of query.matchAll(/"([^"]*)"?|(\S+)/g)) {
+    const term = (m[1] ?? m[2]).trim();
+    if (term) terms.push(term);
+  }
+  return terms;
+}
+
+/** Escapes text and wraps each case-insensitive match of any term in <mark>. */
+export function markMatches(text: string, terms: string[]): string {
+  const lower = text.toLowerCase();
+  const hits: [number, number][] = [];
+  for (const term of terms) {
+    const t = term.toLowerCase();
+    for (let at = lower.indexOf(t); t && at >= 0; at = lower.indexOf(t, at + t.length)) hits.push([at, at + t.length]);
+  }
+  hits.sort((a, b) => a[0] - b[0]);
+  let out = '';
+  let pos = 0;
+  for (const [from, to] of hits) {
+    if (from < pos) continue;
+    out += `${escapeHtml(text.slice(pos, from))}<mark>${escapeHtml(text.slice(from, to))}</mark>`;
+    pos = to;
+  }
+  return out + escapeHtml(text.slice(pos));
+}

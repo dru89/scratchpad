@@ -178,6 +178,7 @@ Ctrl on Linux, Cmd on macOS.
 | Inbox / Archive / Trash | Ctrl+1 / Ctrl+2 / Ctrl+3 |
 | Filter the sidebar | Ctrl+Shift+L |
 | Find in the draft | Ctrl+F |
+| Find and replace | Ctrl+H |
 
 Archiving or trashing from the main or capture window moves that window on to a new draft; a draft's own window stays on it and shows a badge.
 
@@ -197,7 +198,7 @@ Closing the main or capture window hides it, so the app keeps running for the ho
 
 - **Sidebar filter box:** narrows the current list (Inbox, Archive or Trash) as you type.
 - **Quick switcher (Ctrl+K, Cmd+K on macOS):** searches every state except Trash. Enter opens the result in the current editor, which is the capture window when opened from there. Ctrl+Enter (Cmd+Enter on macOS) opens it in a new window.
-- **Find within a draft:** CodeMirror's search panel.
+- **Find within a draft:** a slim panel over CodeMirror's search ([`app/src/editor/find.ts`](../app/src/editor/find.ts)), with replace on Ctrl+H.
 
 Qualifiers like `in:archive`, and saved searches as a light form of organization, come later.
 

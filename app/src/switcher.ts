@@ -3,7 +3,8 @@
 
 import { bridge, type DraftSummary } from './bridge';
 import type { DraftController } from './controller';
-import { escapeHtml, relativeTime } from './format';
+import { escapeHtml, kbd, markMatches, relativeTime, searchTerms } from './format';
+import { icon } from './icons';
 import type { Rpc } from './rpc';
 
 export class Switcher {
@@ -24,8 +25,17 @@ export class Switcher {
     this.el.hidden = true;
     this.el.innerHTML = `
       <div class="switcher-box" role="dialog" aria-label="Open a draft">
-        <input type="search" placeholder="Find a draft" spellcheck="false">
+        <div class="switcher-field">
+          ${icon('search')}
+          <input type="search" placeholder="Jump to a draft" spellcheck="false">
+        </div>
         <div class="switcher-list" role="listbox"></div>
+        <div class="switcher-foot">
+          <span>${kbd('Up')}${kbd('Down')} choose</span>
+          <span>${kbd('Enter')} open</span>
+          <span>${kbd('Mod+Enter')} own window</span>
+          <span>${kbd('Esc')} close</span>
+        </div>
       </div>`;
     document.body.appendChild(this.el);
     this.input = this.el.querySelector('input')!;
@@ -77,17 +87,24 @@ export class Switcher {
 
   private render() {
     const now = Date.now();
-    this.listEl.innerHTML = this.results.length
-      ? this.results
-          .map(
-            (d, i) => `<div class="switcher-item${i === this.index ? ' active' : ''}" data-index="${i}" role="option">
-              <div class="item-row"><span class="item-title">${escapeHtml(d.title)}</span>
-              <span class="item-time">${d.state === 'archived' ? 'Archive · ' : ''}${relativeTime(d.modifiedAt, now)}</span></div>
-              ${d.snippet ? `<div class="item-snippet">${escapeHtml(d.snippet)}</div>` : ''}
-            </div>`,
-          )
-          .join('')
-      : `<div class="empty">No matches</div>`;
+    const query = this.input.value.trim();
+    const terms = searchTerms(query);
+    const rows = this.results
+      .map(
+        (d, i) => `<div class="switcher-item${i === this.index ? ' active' : ''}" data-index="${i}" role="option">
+          <div class="item-row"><span class="item-title">${markMatches(d.title, terms)}</span>
+          ${d.state === 'archived' ? '<span class="item-tag">Archived</span>' : ''}
+          <span class="item-time">${relativeTime(d.modifiedAt, now)}</span></div>
+          ${d.snippet ? `<div class="item-snippet">${markMatches(d.snippet, terms)}</div>` : ''}
+        </div>`,
+      )
+      .join('');
+    const empty = query ? `No drafts match “${escapeHtml(query)}”` : 'No drafts yet';
+    this.listEl.innerHTML = !this.results.length
+      ? `<div class="empty"><p class="empty-title">${empty}</p></div>`
+      : query
+        ? rows
+        : `<div class="switcher-label">Recent</div>${rows}`;
     this.listEl.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
   }
 

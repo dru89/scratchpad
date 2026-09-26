@@ -4,6 +4,8 @@
 import './style.css';
 import { bridge, type DraftState } from './bridge';
 import { DraftController } from './controller';
+import { escapeHtml } from './format';
+import { type IconName, icon } from './icons';
 import { Rpc } from './rpc';
 import { Sidebar } from './sidebar';
 import { Switcher } from './switcher';
@@ -39,10 +41,10 @@ function keyName(e: KeyboardEvent): string {
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
-function toast(message: string) {
+function toast(message: string, iconName: IconName | null = 'done') {
   const el = document.getElementById('toast');
   if (!el) return;
-  el.textContent = message;
+  el.innerHTML = `${iconName ? icon(iconName) : ''}<span>${escapeHtml(message)}</span>`;
   el.hidden = false;
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.hidden = true), 1800);
@@ -56,17 +58,22 @@ async function start() {
   status.floating = !!info.prefs.float;
 
   const app = document.getElementById('app')!;
+  // The capture window's toolbar sits under the editor, so its text starts
+  // right under the title bar (docs/visual-design.md#layout).
+  const editorEl = '<div id="editor" class="editor"></div>';
   app.innerHTML = `
-    ${kind === 'main' ? '<aside id="sidebar"></aside>' : ''}
-    <main id="pane"><header id="toolbar"></header><div id="editor"></div></main>`;
+    ${kind === 'main' ? '<aside id="sidebar" class="sidebar"></aside>' : ''}
+    <main id="pane" class="pane">${
+      kind === 'capture' ? `${editorEl}<footer id="toolbar" class="toolbar"></footer>` : `<header id="toolbar" class="toolbar"></header>${editorEl}`
+    }</main>`;
 
   const controller = new DraftController(document.getElementById('editor')!, rpc, kind, info.prefs, info.idleMs);
   const switcher = new Switcher(rpc, controller);
   const sidebar = kind === 'main' ? new Sidebar(document.getElementById('sidebar')!, rpc, controller) : null;
 
-  const setState = async (state: DraftState, message: string) => {
+  const setState = async (state: DraftState, message: string, iconName: IconName) => {
     await controller.setState(state);
-    toast(message);
+    toast(message, iconName);
     // The main and capture windows move on; a draft's own window stays on it.
     if (kind !== 'draft' && state !== 'inbox') controller.newDraft();
   };
@@ -86,7 +93,7 @@ async function start() {
     pin() {
       if (kind === 'draft') return;
       controller.setPinned(!controller.pinned);
-      toast(controller.pinned ? 'Pinned: this draft stays when you come back' : 'Unpinned');
+      toast(controller.pinned ? 'Pinned: this draft stays when you come back' : 'Unpinned', 'pin');
     },
     async float() {
       status.floating = await bridge().setFloat(!status.floating);
@@ -98,18 +105,18 @@ async function start() {
         await bridge().copyRich(controller.markdownForCopy());
         toast('Copied as rich text');
       } catch {
-        toast("Couldn't copy: scratchpadd isn't reachable");
+        toast("Couldn't copy: scratchpadd isn't reachable", null);
       }
     },
     async archive() {
       if (!controller.draftId) return;
-      if (controller.state === 'archived') await setState('inbox', 'Moved to Inbox');
-      else await setState('archived', 'Archived');
+      if (controller.state === 'archived') await setState('inbox', 'Moved to Inbox', 'inbox');
+      else await setState('archived', 'Archived', 'archive');
     },
     async trash() {
       if (!controller.draftId) return;
-      if (controller.state === 'trashed') await setState('inbox', 'Restored');
-      else await setState('trashed', 'Moved to Trash');
+      if (controller.state === 'trashed') await setState('inbox', 'Restored', 'inbox');
+      else await setState('trashed', 'Moved to Trash', 'trash');
     },
     openWindow() {
       const id = controller.draftId;
@@ -127,7 +134,7 @@ async function start() {
     controller.onChange(() => bridge().setTitle(`${controller.title} — scratchpad`));
     void ready.then(() => {
       if (!controller.draftId) {
-        toast("This draft doesn't exist anymore");
+        toast("This draft doesn't exist anymore", null);
         setTimeout(() => bridge().close(), 1500);
       }
     });

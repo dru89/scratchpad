@@ -20,7 +20,7 @@ Working name for a Drafts-style scratchpad: a place where text starts, gets shap
 - iOS: SwiftUI shell hosting the same editor in a WKWebView, native text view for quick capture.
 - Sync: small Rust server storing opaque encrypted records (Loro `%ELO` framing).
 
-See [`docs/design.md`](docs/design.md) for the v1 design, [`docs/decisions.md`](docs/decisions.md) for the reasoning, and [`docs/research.md`](docs/research.md) for the background.
+See [`docs/design.md`](docs/design.md) for the v1 design, [`docs/visual-design.md`](docs/visual-design.md) for how it looks and why, [`docs/decisions.md`](docs/decisions.md) for the reasoning, and [`docs/research.md`](docs/research.md) for the background.
 
 ## Next
 
