@@ -58,6 +58,8 @@ export class Switcher {
 
   close() {
     this.el.hidden = true;
+    this.results = [];
+    this.listEl.innerHTML = '';
     this.controller.focus();
   }
 

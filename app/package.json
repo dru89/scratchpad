@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p electron",
     "start": "npm run build && electron --ozone-platform=wayland .",
     "test": "vitest run",
-    "test:e2e": "npm run build && playwright test"
+    "test:e2e": "npm run build && playwright test",
+    "screenshots": "npm run build && SCRATCHPAD_SCREENSHOTS=../docs/design-handoff/screenshots playwright test screenshots"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",
