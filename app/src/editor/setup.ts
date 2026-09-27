@@ -28,7 +28,8 @@ const highlight = HighlightStyle.define([
   // Code in fenced blocks, highlighted by the language named after the fence.
   { tag: [t.keyword, t.controlKeyword, t.operatorKeyword, t.definitionKeyword, t.moduleKeyword, t.modifier], class: 'cm-code-keyword' },
   { tag: [t.string, t.special(t.string), t.regexp, t.character], class: 'cm-code-string' },
-  { tag: [t.number, t.bool, t.null, t.atom, t.unit], class: 'cm-code-number' },
+  // Not t.atom: markdown uses it for a task's [ ].
+  { tag: [t.number, t.bool, t.null, t.unit], class: 'cm-code-number' },
   { tag: [t.typeName, t.className, t.namespace], class: 'cm-code-type' },
   { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], class: 'cm-code-comment' },
   { tag: [t.function(t.variableName), t.function(t.definition(t.variableName)), t.definition(t.function(t.variableName))], class: 'cm-code-function' },

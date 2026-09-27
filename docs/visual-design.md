@@ -40,7 +40,7 @@ Editor sizes are in em of `--editor-size` (16px, or 15px in the capture window),
 
 ## The editor
 
-The markdown text is the only source of truth. The editor decorates it and keeps no state of its own. Syntax is hidden except in the element the cursor is in, and that's where it comes back, in `--ink-3`. The bullet dot and the rule only replace syntax visually. The task box does too, and clicking it checks or unchecks the item by editing its `[ ]` or `[x]` in the text, the same edit typing would make.
+The markdown text is the only source of truth. The editor decorates it and keeps no state of its own. Syntax is hidden except in the element the cursor is in, and that's where it comes back, in `--ink-3`. The bullet dot and the rule only replace syntax visually. The task box does too, and clicking it checks or unchecks the item by editing its `[ ]` or `[x]` in the text, the same edit typing would make. On the line being edited, where the box shows as `[ ]`, clicking that text does the same.
 
 Rhythm is where most of the calm comes from:
 

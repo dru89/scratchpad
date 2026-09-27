@@ -299,6 +299,13 @@ test.describe.serial('scratchpad app', () => {
     await expect(boxes.first()).toHaveAttribute('aria-checked', 'true');
     await boxes.first().click();
     await expect.poll(() => run('show', id)).toBe('Errands\n\n- [ ] milk\n- [ ] stamps\n');
+
+    // On the line being edited the box is text, and clicking that works too.
+    await main.locator('.cm-line', { hasText: 'stamps' }).click();
+    const raw = main.locator('.cm-task-raw');
+    await expect(raw).toHaveText('[ ]');
+    await raw.click();
+    await expect.poll(() => run('show', id)).toBe('Errands\n\n- [ ] milk\n- [x] stamps\n');
   });
 
   test('toolbar buttons explain themselves on hover', async () => {

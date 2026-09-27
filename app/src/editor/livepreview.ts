@@ -49,7 +49,7 @@ class TaskWidget extends WidgetType {
   eq(other: TaskWidget) {
     return other.done === this.done;
   }
-  /** Clicking the box checks or unchecks it by editing its [ ] or [x], as typing would. */
+  /** Clicking the box checks or unchecks it (toggleTask). */
   toDOM(view: EditorView) {
     const el = document.createElement('span');
     el.className = this.done ? 'cm-task is-done' : 'cm-task';
@@ -59,20 +59,29 @@ class TaskWidget extends WidgetType {
     el.addEventListener('mousedown', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const at = view.posAtDOM(el);
-      const line = view.state.doc.lineAt(at);
-      const box = /\[([ xX])\]/.exec(line.text.slice(at - line.from));
-      if (!box) return;
-      const pos = at + box.index + 1;
-      view.dispatch({ changes: { from: pos, to: pos + 1, insert: box[1] === ' ' ? 'x' : ' ' }, userEvent: 'input.toggle' });
+      toggleTask(view, view.posAtDOM(el));
     });
     return el;
   }
 }
 
+/**
+ * Checks or unchecks the task whose box starts at or after `at` on its line,
+ * by editing its [ ] or [x], the same edit typing would make.
+ */
+function toggleTask(view: EditorView, at: number) {
+  const line = view.state.doc.lineAt(at);
+  const box = /\[([ xX])\]/.exec(line.text.slice(at - line.from));
+  if (!box) return;
+  const pos = at + box.index + 1;
+  view.dispatch({ changes: { from: pos, to: pos + 1, insert: box[1] === ' ' ? 'x' : ' ' }, userEvent: 'input.toggle' });
+}
+
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const rule = Decoration.replace({ widget: new RuleWidget() });
 const tasks = [false, true].map((done) => Decoration.replace({ widget: new TaskWidget(done) }));
+/** The [ ] or [x] shown as text on the line being edited, which clicks toggle too. */
+const rawTask = Decoration.mark({ class: 'cm-task-raw' });
 
 export function touches(state: EditorState, from: number, to: number): boolean {
   for (const r of state.selection.ranges) {
@@ -169,7 +178,10 @@ function build(view: EditorView): DecorationSet {
             const line = doc.lineAt(node.from);
             const done = /x/i.test(doc.sliceString(node.from, node.to));
             if (done) out.push(lineClass('cm-task-done').range(line.from));
-            if (touches(state, line.from, line.to)) return;
+            if (touches(state, line.from, line.to)) {
+              out.push(rawTask.range(node.from, node.to));
+              return;
+            }
             // In a bullet list the box replaces "- [ ]"; in a numbered one, just "[ ]".
             const item = node.node.parent?.parent;
             const mark = item?.parent?.name === 'BulletList' ? item.getChild('ListMark') : null;
@@ -225,5 +237,16 @@ export const livePreview = ViewPlugin.fromClass(
       }
     }
   },
-  { decorations: (v) => v.decorations },
+  {
+    decorations: (v) => v.decorations,
+    eventHandlers: {
+      mousedown(e, view) {
+        const raw = (e.target as HTMLElement).closest<HTMLElement>('.cm-task-raw');
+        if (!raw || e.button !== 0 || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false;
+        e.preventDefault();
+        toggleTask(view, view.posAtDOM(raw));
+        return true;
+      },
+    },
+  },
 );

@@ -798,6 +798,12 @@ input[type='search']::-webkit-search-cancel-button {
   color: var(--ink-3);
 }
 
+/* A task's [ ] on the line being edited: clicking it checks the task. */
+.cm-task-raw {
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
 .cm-link {
   color: var(--accent);
 }
