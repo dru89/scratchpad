@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Makes the app icons from one square, full-bleed source image.
+"""Makes the app icons from one square, full-bleed source image: by
+default the vector source, app/build/icon.svg.
 
-    app/scripts/make-icons.py path/to/source.png
+    app/scripts/make-icons.py [source.svg | source.png]
 
 Writes:
   app/build/icon.png            1024px macOS icon: the artwork in Apple's
@@ -11,10 +12,12 @@ Writes:
   app/build/icons/<n>x<n>.png   the same shape at Linux icon sizes.
   docs/images/icon.png          256px, for the top of the README.
 
-Needs Pillow.
+Needs Pillow, and rsvg-convert (librsvg) for an SVG source.
 """
 
+import io
 import math
+import subprocess
 import sys
 from pathlib import Path
 
@@ -66,10 +69,19 @@ def macos_icon(art: Image.Image) -> Image.Image:
     return icon
 
 
+def load(path: Path) -> Image.Image:
+    if path.suffix == ".svg":
+        png = subprocess.run(
+            ["rsvg-convert", "-w", str(CANVAS), "-h", str(CANVAS), str(path)], check=True, capture_output=True
+        ).stdout
+        return Image.open(io.BytesIO(png))
+    return Image.open(path)
+
+
 def main() -> None:
-    if len(sys.argv) != 2:
+    if len(sys.argv) > 2:
         sys.exit(__doc__)
-    source = Image.open(sys.argv[1])
+    source = load(Path(sys.argv[1]) if len(sys.argv) == 2 else ROOT / "app" / "build" / "icon.svg")
     if source.width != source.height:
         sys.exit(f"the source should be square; it's {source.width}x{source.height}")
 

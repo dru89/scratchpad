@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/icon.png" width="128" height="128" alt=""></p>
+
 # scratchpad
 
 A place where text starts. Write the first version of something, like a reply, meeting notes or a paragraph for a doc, shape it, then copy it wherever it's going. scratchpad keeps every draft in one list and asks you to make one decision about each: whether you're done with it.

@@ -85,6 +85,10 @@ One stroke set in [`icons.ts`](../app/src/icons.ts): a 24px grid, 1.75 stroke, r
 
 Float on top is a window with an up chevron, after Plasma's "Keep Above Others"; a stack of layers read as "layers", and a pin would collide with Pin. No emoji and no glyph icons. Keycaps are text in `.kbd` (`kbd()` in format.ts), one cap per key, with Ctrl shown as ⌘ on macOS.
 
+## App icon
+
+The icon is [`app/build/icon.svg`](../app/build/icon.svg): a sheet from a pad, glued edge in `--ink`, lying on graphite with a soft shadow, and on it a lowercase s and the caret. The s is Atkinson Hyperlegible Next at weight 540, drawn as an outline so the icon doesn't depend on the font. The caret is thinner than the s's stroke and set well apart, so the pair doesn't read as "sl", and it's the only color, the way the accent marks where you are in the app. The graphite is a step lighter than the glued edge, so the edge still reads at small sizes. `app/scripts/make-icons.py` cuts it to the macOS shape, adds the standard margin and shadow, and writes every size for macOS, Linux and this README.
+
 ## Words
 
 Interface text is plain, short and sentence case, with no exclamation marks and no emoji. It names the thing and what happened to it: "Copied as rich text", "Moved to Trash", "Restored". The three places are Inbox, Archive and Trash, capitalized as names, and the things in them are drafts, not notes or files. A state is a short label; its explanation goes in the tooltip ("Reconnecting to scratchpadd. Your typing is kept."). Empty states are one line of fact and one line of help with a keycap: "Nothing in the Inbox" / "Ctrl N starts a draft". Never apologize or cheer.
@@ -106,4 +110,4 @@ These aren't designed yet, and each has a place reserved. A sync indicator takes
 
 ## Known gaps
 
-- The app icon and wordmark in the design system are a direction, not finished; the 16px icon needs a hand-hinted version.
+- The 16px app icon is the large one scaled down; it could use a hand-hinted version, and the wordmark in the design system is still a direction.
