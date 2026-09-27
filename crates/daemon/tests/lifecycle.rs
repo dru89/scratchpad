@@ -28,13 +28,24 @@ impl Env {
     }
 
     fn start_binary(&self, binary: &Path) -> Child {
-        Command::new(binary)
-            .env("SCRATCHPAD_DATA_DIR", &self.data)
-            .env("SCRATCHPAD_SOCKET", &self.socket)
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .spawn()
-            .unwrap()
+        // A binary this test just wrote can be briefly "busy" on Linux: a
+        // process another test forks in that moment holds it open until it
+        // execs. Try again until that passes.
+        for _ in 0..50 {
+            match Command::new(binary)
+                .env("SCRATCHPAD_DATA_DIR", &self.data)
+                .env("SCRATCHPAD_SOCKET", &self.socket)
+                .stdout(Stdio::null())
+                .stderr(Stdio::piped())
+                .spawn()
+            {
+                Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                    std::thread::sleep(Duration::from_millis(20))
+                }
+                result => return result.unwrap(),
+            }
+        }
+        panic!("{} stayed busy", binary.display());
     }
 }
 
