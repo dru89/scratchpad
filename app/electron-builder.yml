@@ -1,11 +1,8 @@
 # Packages the app with the daemon and CLI inside it. Build the Rust
 # binaries first (cargo build --release --bin scratchpadd --bin scratchpad),
-# then `npm run package`. CI signs and notarizes the macOS build: with
-# CSC_LINK and CSC_KEY_PASSWORD set it signs, and with APPLE_ID,
-# APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID set it notarizes.
-#
-# electron-builder stays on 25: 26.15 fails to unlock its temporary signing
-# keychain on the macOS 26 runners.
+# then `npm run package`. On macOS it signs with a Developer ID identity
+# from the keychain (CI imports one and sets CSC_KEYCHAIN), and with
+# APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID set it notarizes.
 
 appId: dev.unremarkable.scratchpad
 productName: scratchpad

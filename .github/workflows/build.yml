@@ -73,21 +73,46 @@ jobs:
       - run: npm run typecheck && npm test
         working-directory: app
 
+      # electron-builder can import the certificate itself (CSC_LINK), but the
+      # keychain it makes won't unlock on current macOS 26 runners. So import
+      # it here, the way GitHub documents, and point electron-builder at it.
+      - name: Import the signing certificate
+        if: github.event_name != 'pull_request'
+        env:
+          MAC_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$MAC_CERTIFICATE_BASE64" ]; then
+            echo "No signing certificate configured."
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password=$(openssl rand -hex 24)
+          echo "$MAC_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$MAC_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$keychain"
+          echo "SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
       - name: Package
         working-directory: app
         env:
           SIGN: ${{ github.event_name != 'pull_request' }}
-          CSC_LINK: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        # Missing secrets arrive as empty variables, and electron-builder
-        # reads an empty CSC_LINK as a path. Unset them to build unsigned.
+        # Missing secrets arrive as empty variables; unset them to skip
+        # notarization, and skip signing without a keychain.
         run: |
-          if [ "$SIGN" != true ] || [ -z "$CSC_LINK" ]; then
+          if [ "$SIGN" = true ] && [ -n "$SIGNING_KEYCHAIN" ]; then
+            export CSC_KEYCHAIN="$SIGNING_KEYCHAIN"
+          else
             echo "Building unsigned."
-            unset CSC_LINK CSC_KEY_PASSWORD
             export CSC_IDENTITY_AUTO_DISCOVERY=false
           fi
           if [ "$SIGN" != true ] || [ -z "$APPLE_ID" ]; then
