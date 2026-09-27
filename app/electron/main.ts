@@ -14,12 +14,15 @@ import {
   type MenuItemConstructorOptions,
   net,
   protocol,
+  shell,
 } from 'electron';
 import { mkdirSync, rmSync, symlinkSync } from 'node:fs';
+import { utimes, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AppClient } from './daemon';
+import { fileStem } from './filename';
 import { checkNow, restartToUpdate, startUpdates, updateReady, updatesEnabled } from './updates';
 import { StateStore, Windows } from './windows';
 
@@ -100,6 +103,7 @@ interface ContextItem {
 
 interface MenuHandlers {
   emptyTrash(): void;
+  exportAll(): void;
   restartToUpdate(): void;
 }
 
@@ -139,6 +143,7 @@ function draftMenu(): MenuItemConstructorOptions {
       },
       { type: 'separator' },
       item('Duplicate', 'duplicate'),
+      item('Export…', 'export'),
       item('Get Info', 'info', 'CmdOrCtrl+I'),
       item('Open in New Window', 'openWindow', 'CmdOrCtrl+Shift+O'),
       { type: 'separator' },
@@ -160,9 +165,13 @@ function buildMenu(handlers: MenuHandlers): Menu {
     submenu: [{ role: 'toggleDevTools' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }],
   };
   const emptyTrash: MenuItemConstructorOptions = { id: 'emptyTrash', label: 'Empty Trash…', click: handlers.emptyTrash };
+  const exportAll: MenuItemConstructorOptions = { id: 'exportAll', label: 'Export All…', click: handlers.exportAll };
   if (!isMac) {
     return Menu.buildFromTemplate([
-      { label: 'File', submenu: [emptyTrash, { type: 'separator' }, { role: 'close' }, { role: 'quit' }] },
+      {
+        label: 'File',
+        submenu: [exportAll, emptyTrash, { type: 'separator' }, { role: 'close' }, { role: 'quit' }],
+      },
       edit,
       draftMenu(),
       view,
@@ -197,7 +206,7 @@ function buildMenu(handlers: MenuHandlers): Menu {
         { role: 'quit' },
       ],
     },
-    { label: 'File', submenu: [emptyTrash, { type: 'separator' }, { role: 'close' }] },
+    { label: 'File', submenu: [exportAll, emptyTrash, { type: 'separator' }, { role: 'close' }] },
     edit,
     draftMenu(),
     view,
@@ -240,8 +249,53 @@ if (!app.requestSingleInstanceLock()) {
     if (response === 0) await daemon.call('drafts.emptyTrash');
   }
 
+  /**
+   * Export All…: every draft as markdown in a zip (docs/design.md#export),
+   * written by the daemon, which has them all.
+   */
+  async function exportAll(parent?: BrowserWindow | null) {
+    const d = new Date();
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const options: Electron.SaveDialogOptions = {
+      title: 'Export All Drafts',
+      defaultPath: join(app.getPath('documents'), `scratchpad-${date}.zip`),
+      filters: [{ name: 'Zip archive', extensions: ['zip'] }],
+    };
+    const { canceled, filePath } = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options);
+    if (canceled || !filePath) return;
+    const r = await daemon.call<{ drafts: number }>('drafts.export', { path: filePath, zip: true, overwrite: true });
+    const done: Electron.MessageBoxOptions = {
+      message: `Exported ${r.drafts} ${r.drafts === 1 ? 'draft' : 'drafts'}`,
+      detail: filePath,
+      buttons: ['OK', isMac ? 'Show in Finder' : 'Show in Folder'],
+      defaultId: 0,
+    };
+    const { response } = parent ? await dialog.showMessageBox(parent, done) : await dialog.showMessageBox(done);
+    if (response === 1) shell.showItemInFolder(filePath);
+  }
+
+  /** Export…: one draft as a .md file, named from its title and dated like it. */
+  async function exportDraft(id: string, parent?: BrowserWindow | null): Promise<string | null> {
+    const draft = await daemon.call<{ title: string; text: string; modifiedAt: number }>('drafts.get', { id });
+    const options: Electron.SaveDialogOptions = {
+      title: 'Export Draft',
+      defaultPath: join(app.getPath('documents'), `${fileStem(draft.title)}.md`),
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    };
+    const { canceled, filePath } = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options);
+    if (canceled || !filePath) return null;
+    await writeFile(filePath, draft.text);
+    const modified = new Date(draft.modifiedAt);
+    await utimes(filePath, modified, modified);
+    return filePath;
+  }
+
   const menuHandlers: MenuHandlers = {
     emptyTrash: () => void emptyTrash(BrowserWindow.getFocusedWindow()).catch((e) => console.error('scratchpad:', e)),
+    exportAll: () =>
+      void exportAll(BrowserWindow.getFocusedWindow()).catch((e) =>
+        dialog.showMessageBox({ type: 'warning', message: "Couldn't export", detail: String(e.message ?? e) }),
+      ),
     restartToUpdate: () =>
       restartToUpdate(() => {
         if (windows) windows.quitting = true;
@@ -352,6 +406,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     ipcMain.handle('clipboard:copyText', (_e, text: string) => clipboard.writeText(text));
     ipcMain.handle('app:emptyTrash', (e) => emptyTrash(BrowserWindow.fromWebContents(e.sender)));
+    ipcMain.handle('app:exportDraft', (e, id: string) => exportDraft(id, BrowserWindow.fromWebContents(e.sender)));
     ipcMain.handle('app:quit', () => app.quit());
   });
 

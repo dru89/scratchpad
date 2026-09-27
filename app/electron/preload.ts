@@ -25,5 +25,6 @@ contextBridge.exposeInMainWorld('scratchpad', {
   copyRich: (markdown: string) => ipcRenderer.invoke('clipboard:copyRich', markdown),
   copyText: (text: string) => ipcRenderer.invoke('clipboard:copyText', text),
   emptyTrash: () => ipcRenderer.invoke('app:emptyTrash'),
+  exportDraft: (id: string) => ipcRenderer.invoke('app:exportDraft', id),
   quit: () => ipcRenderer.invoke('app:quit'),
 });

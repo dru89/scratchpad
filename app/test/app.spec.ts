@@ -6,7 +6,7 @@
 
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { binDir, launch } from './launch';
@@ -351,5 +351,37 @@ test.describe.serial('scratchpad app', () => {
     });
     await expect.poll(() => list('--trash').length).toBe(0);
     expect(list().some((d) => d.title === 'Hello from the app')).toBe(true);
+  });
+
+  test('Export All saves a zip, and Export saves one draft as markdown', async () => {
+    const main = await windowOf('main');
+    const paths = { zip: join(dir, 'all.zip'), md: join(dir, 'one.md') };
+    // Stand-ins for the save dialogs: remember what they offered, answer with our paths.
+    await app.evaluate(({ dialog }, paths) => {
+      const offered: string[] = [];
+      (globalThis as { offered?: string[] }).offered = offered;
+      dialog.showSaveDialog = (async (...args: unknown[]) => {
+        const options = args[args.length - 1] as Electron.SaveDialogOptions;
+        offered.push(options.defaultPath!);
+        return { canceled: false, filePath: options.defaultPath!.endsWith('.zip') ? paths.zip : paths.md };
+      }) as typeof dialog.showSaveDialog;
+      dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as typeof dialog.showMessageBox;
+    }, paths);
+    const offered = () => app.evaluate(() => (globalThis as { offered?: string[] }).offered ?? []);
+
+    await app.evaluate(({ Menu }) => Menu.getApplicationMenu()!.getMenuItemById('exportAll')!.click());
+    await expect.poll(() => existsSync(paths.zip)).toBe(true);
+    expect((await offered())[0]).toMatch(/scratchpad-\d{4}-\d{2}-\d{2}\.zip$/);
+
+    const id = list().find((d) => d.title === 'Errands')!.id;
+    await main.locator('#sidebar .item-title', { hasText: 'Errands' }).click();
+    await app.evaluate(({ BrowserWindow, Menu }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('kind=main'));
+      Menu.getApplicationMenu()!.getMenuItemById('export')!.click(undefined, win);
+    });
+    await expect.poll(() => existsSync(paths.md)).toBe(true);
+    expect((await offered())[1]).toMatch(/\/Errands\.md$/);
+    expect(readFileSync(paths.md, 'utf8')).toBe(run('show', id).replace(/\n$/, ''));
+    await expect(main.locator('#toast')).toHaveText('Exported');
   });
 });

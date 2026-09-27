@@ -328,3 +328,26 @@ fn a_daemon_older_than_the_cli_is_replaced() {
     let status: Value = serde_json::from_str(&env.ok(&["--json", "daemon", "status"])).unwrap();
     assert_eq!(status["version"], env!("CARGO_PKG_VERSION"), "the CLI's own daemon took over");
 }
+
+#[test]
+fn export_writes_a_folder_or_a_zip() {
+    let env = Env::new();
+    env.ok(&["new", "# Groceries\n\n- milk"]);
+    let archived = env.ok(&["new", "Old plan"]).trim().to_string();
+    env.ok(&["archive", &archived]);
+
+    let dir = env.dir.path().join("export");
+    let out = env.ok(&["export", dir.to_str().unwrap()]);
+    assert_eq!(out.trim(), format!("Exported 2 drafts to {}", dir.display()));
+    assert_eq!(std::fs::read_to_string(dir.join("Inbox/Groceries.md")).unwrap(), "# Groceries\n\n- milk");
+    assert!(dir.join("Archive/Old plan.md").exists());
+    let manifest: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("drafts.json")).unwrap()).unwrap();
+    assert_eq!(manifest["drafts"].as_array().unwrap().len(), 2);
+    assert!(!env.run(&["export", dir.to_str().unwrap()]).status.success(), "not into a folder that has things in it");
+
+    let zip = env.dir.path().join("export.zip");
+    env.ok(&["export", "--zip", zip.to_str().unwrap()]);
+    assert!(std::fs::metadata(&zip).unwrap().len() > 0);
+    assert!(!env.run(&["export", "--zip", zip.to_str().unwrap()]).status.success(), "not over a zip without --force");
+    env.ok(&["export", "--zip", "--force", zip.to_str().unwrap()]);
+}

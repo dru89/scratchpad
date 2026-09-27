@@ -312,6 +312,14 @@ impl Store {
         Ok(stmt.query_map([cutoff], |r| r.get(0))?.collect::<Result<_, _>>()?)
     }
 
+    /// Every draft's summary, for an export.
+    pub fn all_summaries(&self) -> Result<Vec<DraftSummary>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, state, title, created_at, modified_at, trashed_at, preview FROM drafts ORDER BY modified_at DESC, id DESC",
+        )?;
+        Ok(stmt.query_map([], summary_from_row)?.collect::<Result<_, _>>()?)
+    }
+
     /// Every stored draft id, for rebuilding the index.
     pub fn all_ids(&self) -> Result<Vec<String>> {
         let mut stmt = self.conn.prepare("SELECT id FROM docs")?;

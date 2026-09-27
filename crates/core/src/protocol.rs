@@ -185,6 +185,18 @@ pub struct RenderParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ExportParams {
+    /// An absolute path: a new or empty folder, or with `zip`, a file.
+    pub path: String,
+    #[serde(default)]
+    pub zip: bool,
+    /// Replace an existing zip.
+    #[serde(default)]
+    pub overwrite: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DocOpenParams {
     pub id: String,
     /// Base64 Loro version vector the client already has.

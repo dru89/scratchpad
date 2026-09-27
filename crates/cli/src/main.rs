@@ -83,6 +83,17 @@ enum Cmd {
     Open { id: String },
     /// Print a draft's link, which opens it in the app.
     Link { id: String },
+    /// Export every draft as markdown: Inbox, Archive and Trash folders of
+    /// .md files and a drafts.json manifest, into a new or empty folder.
+    Export {
+        path: std::path::PathBuf,
+        /// Write a zip file instead of a folder.
+        #[arg(long)]
+        zip: bool,
+        /// Replace the zip if it already exists.
+        #[arg(long, requires = "zip")]
+        force: bool,
+    },
     /// Serve drafts to agents over MCP on stdio.
     Mcp,
     /// Start, stop, or check the background daemon.
@@ -265,6 +276,18 @@ async fn run(cli: Cli) -> Result<()> {
                 }
                 let d: DraftDetail = c.call("drafts.get", json!({ "id": id })).await?;
                 launch_app(&[format!("--open={}", d.summary.id)])?;
+            }
+        }
+        Cmd::Export { path, zip, force } => {
+            let path = std::path::absolute(&path)?;
+            let v: Value = c
+                .call("drafts.export", json!({ "path": path.to_string_lossy(), "zip": zip, "overwrite": force }))
+                .await?;
+            if json {
+                print_json(&v);
+            } else {
+                let n = v["drafts"].as_u64().unwrap_or(0);
+                println!("Exported {n} draft{} to {}", if n == 1 { "" } else { "s" }, path.display());
             }
         }
         Cmd::Link { id } => {

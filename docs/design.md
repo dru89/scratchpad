@@ -81,7 +81,7 @@ The daemon uses one SQLite database (WAL mode):
 - `drafts_fts`: an FTS5 table using the trigram tokenizer, over each draft's title and plain text.
 - `tombstones`: id and deletedAt.
 
-`drafts` and `drafts_fts` are derived from `docs`, and the daemon rebuilds them on startup if the counts disagree. A schema change there means a migration plus a reindex, never a data conversion. A plain markdown export of every draft is always one command away, as a way out.
+`drafts` and `drafts_fts` are derived from `docs`, and the daemon rebuilds them on startup if the counts disagree. A schema change there means a migration plus a reindex, never a data conversion. A plain markdown export of every draft is always one command away, as a way out (see [Export](#export)).
 
 **Reindexing** happens once a draft's edits pause for 400 ms, or at most 2 s after the first unindexed edit. `drafts.list` flushes anything pending first, so a list or search always reflects edits already acknowledged. When only metadata changed, for example an archive or a `modifiedAt` stamp, the search index is left alone. Rewriting it costs about 45 ms for a 100k-word draft.
 
@@ -111,6 +111,7 @@ Every `id` parameter accepts a full id or any unique prefix of one, case-insensi
 | `drafts.setState` | `id`, `state` | Doesn't change `modifiedAt`. |
 | `drafts.discard` | `id` | Deletes a draft outright. Refused unless the body is empty. |
 | `drafts.emptyTrash` | | Deletes everything in the Trash now and returns `deleted`, the count. The app asks first; the CLI and MCP server don't offer it. |
+| `drafts.export` | `path` (absolute), `zip?`, `overwrite?` | Writes every draft as markdown (see [Export](#export)) to a new or empty folder, or with `zip` to a zip file, replacing an existing one only with `overwrite`. Returns `drafts`, the count. Not offered to agents. |
 | `drafts.render` | `id` or `text` | `{html}`: GitHub-flavored HTML with raw HTML dropped, for rich copy. |
 | `drafts.subscribe` / `unsubscribe` | | Notifications: `drafts.changed {summary}`, `drafts.removed {id}`. |
 | `doc.open` | `id`, `version?` (a version vector) | A snapshot, or the updates since `version`, plus the daemon's version vector. Starts `doc.update {id, update}` notifications for that draft. One task handles every request in order, so the reply always reaches the client before any update for that draft. |
@@ -214,6 +215,16 @@ Each result carries a snippet: a line of plain text around the first match outsi
 - **Find within a draft:** a slim panel over CodeMirror's search ([`app/src/editor/find.ts`](../app/src/editor/find.ts)), with replace on Ctrl+H. A rendered table marks its own matches, because CodeMirror's highlighting can't reach inside the widget.
 
 Qualifiers like `in:archive`, and saved searches as a light form of organization, come later.
+
+## Export
+
+An export is every draft as markdown, in the layout an import could read back:
+
+- `Inbox/`, `Archive/` and `Trash/`, one `.md` file per draft holding its markdown exactly, with no front matter.
+- Files are named from the title, made safe for macOS, Linux and Windows: no path separators, reserved or control characters, no leading dots, 80 characters at most, and "Untitled" when nothing is left. When two drafts in a folder would share a name (ignoring case), the older one gets " 2". Each file is dated with its draft's `modifiedAt`.
+- `drafts.json` lists each draft's id, title, state, file, and created, modified and trashed times.
+
+The daemon writes it ([`crates/core/src/export.rs`](../crates/core/src/export.rs)), taking open drafts from memory so the latest typing is in it. `scratchpad export <dir>` writes a folder, which has to be new or empty, and `--zip` a zip (`--force` to replace one). In the app, File > Export All… saves a zip, `scratchpad-<date>.zip` by default. Export… in the Draft menu and the sidebar's context menu saves one draft as a `.md` file, named the same way.
 
 ## Rich copy
 

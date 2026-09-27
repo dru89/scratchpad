@@ -160,6 +160,14 @@ async function start() {
   const getInfo = () => {
     if (controller.draftId) showInfo(controller.draftId);
   };
+  const exportOwn = async () => {
+    if (!controller.draftId || controller.isBlank()) return;
+    try {
+      if (await bridge().exportDraft(controller.draftId)) toast('Exported');
+    } catch {
+      toast("Couldn't export: scratchpadd isn't reachable", null);
+    }
+  };
 
   const params = new URLSearchParams(location.search);
   const ready = controller.init(kind === 'draft' ? (params.get('draft') ?? undefined) : info.prefs.draftId);
@@ -232,6 +240,7 @@ async function start() {
     copyLink: () => copyOwn('link'),
     copyId: () => copyOwn('id'),
     duplicate,
+    export: exportOwn,
     info: getInfo,
     openWindow: actions.openWindow,
     archive: actions.archive,

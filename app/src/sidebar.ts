@@ -163,6 +163,7 @@ export class Sidebar {
       d.state === 'trashed' ? { id: 'inbox', label: 'Restore from Trash' } : { id: 'trashed', label: 'Move to Trash' },
       sep,
       { id: 'duplicate', label: 'Duplicate' },
+      { id: 'export', label: 'Export…' },
       { id: 'info', label: 'Get Info' },
       { id: 'copy', label: 'Copy', submenu: COPY_ITEMS },
       ...(this.tab === 'trashed' ? [sep, { id: 'empty', label: 'Empty Trash…' }] : []),
@@ -178,6 +179,8 @@ export class Sidebar {
         if (this.tab !== 'inbox') this.setTab('inbox');
         await this.controller.load(copy);
         this.ui.toast('Duplicated');
+      } else if (choice === 'export') {
+        if (await bridge().exportDraft(id)) this.ui.toast('Exported');
       } else if (choice === 'info') this.ui.info(id);
       else if (choice?.startsWith('copy:')) this.ui.toast(await copyDraft(this.rpc, id, choice.slice(5) as CopyWhat));
       else if (choice === 'empty') await bridge().emptyTrash();

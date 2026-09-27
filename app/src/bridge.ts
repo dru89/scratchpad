@@ -53,6 +53,8 @@ export interface Bridge {
   copyText(text: string): Promise<void>;
   /** Asks, then empties the Trash. */
   emptyTrash(): Promise<void>;
+  /** Asks where, then saves the draft as a .md file; the path, or null if cancelled. */
+  exportDraft(id: string): Promise<string | null>;
   quit(): Promise<void>;
 }
 

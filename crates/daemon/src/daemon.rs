@@ -242,6 +242,7 @@ impl Daemon {
             "drafts.setState" => self.set_state(params(p)?),
             "drafts.discard" => self.discard(params(p)?),
             "drafts.emptyTrash" => self.empty_trash(),
+            "drafts.export" => self.export(params(p)?),
             "drafts.render" => self.render(params(p)?),
             "drafts.subscribe" | "drafts.unsubscribe" => {
                 if let Some(c) = self.clients.get_mut(&client) {
@@ -450,6 +451,37 @@ impl Daemon {
             self.delete(id)?;
         }
         Ok(json!({ "deleted": ids.len() }))
+    }
+
+    /// Writes every draft as markdown to a folder or a zip
+    /// (scratchpad_core::export). Open drafts come from memory, so the
+    /// export has the latest typing.
+    fn export(&mut self, p: proto::ExportParams) -> Result<Value, RpcError> {
+        let path = std::path::PathBuf::from(&p.path);
+        if !path.is_absolute() {
+            return Err(RpcError::invalid_params("the export path has to be absolute"));
+        }
+        self.flush_dirty(true);
+        let mut drafts = Vec::new();
+        for summary in self.store.all_summaries().map_err(internal)? {
+            let body = match self.docs.get(&summary.id) {
+                Some(open) => draft::body(&open.doc).to_string(),
+                None => match self.store.load_doc(&summary.id).map_err(internal)? {
+                    Some((doc, _)) => draft::body(&doc).to_string(),
+                    None => continue,
+                },
+            };
+            drafts.push((summary, body));
+        }
+        let entries =
+            scratchpad_core::export::entries(&drafts, self.now(), &format!("scratchpad {}", env!("CARGO_PKG_VERSION")));
+        let written = if p.zip {
+            scratchpad_core::export::write_zip(&entries, &path, p.overwrite)
+        } else {
+            scratchpad_core::export::write_dir(&entries, &path)
+        };
+        written.map_err(|e| RpcError::new(codes::INTERNAL, format!("{e:#}")))?;
+        Ok(json!({ "drafts": drafts.len(), "path": p.path }))
     }
 
     fn render(&mut self, p: proto::RenderParams) -> Result<Value, RpcError> {
@@ -917,6 +949,24 @@ mod tests {
         assert_eq!(h.call(&mut c, "drafts.discard", json!({ "id": full })).0.unwrap_err().code, codes::NOT_EMPTY);
         h.ok(&mut c, "drafts.discard", json!({ "id": empty }));
         assert_eq!(titles(&h.ok(&mut c, "drafts.list", json!({}))), ["keep me"]);
+    }
+
+    #[test]
+    fn export_writes_every_draft_including_unsaved_typing() {
+        let mut h = Harness::new();
+        let mut c = h.client();
+        h.ok(&mut c, "drafts.create", json!({ "text": "# Plan\n\nfirst" }));
+        let id = h.ok(&mut c, "drafts.create", json!({ "text": "Old idea" }))["id"].clone();
+        h.ok(&mut c, "drafts.setState", json!({ "id": id, "state": "trashed" }));
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("export");
+        let r = h.ok(&mut c, "drafts.export", json!({ "path": out.to_str().unwrap() }));
+        assert_eq!(r["drafts"], 2);
+        assert_eq!(std::fs::read_to_string(out.join("Inbox/Plan.md")).unwrap(), "# Plan\n\nfirst");
+        assert!(out.join("Trash/Old idea.md").exists());
+        assert!(out.join("drafts.json").exists());
+        let err = h.call(&mut c, "drafts.export", json!({ "path": "relative/dir" })).0.unwrap_err();
+        assert_eq!(err.code, codes::INVALID_PARAMS);
     }
 
     #[test]

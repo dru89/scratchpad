@@ -103,6 +103,7 @@ scratchpad show 01M3F9ZX7F               # the draft as markdown
 scratchpad edit 01M3F9ZX7F               # in $EDITOR; typing done elsewhere meanwhile is kept
 scratchpad archive 01M3F9ZX7F            # also trash and restore
 scratchpad link 01M3F9ZX7F               # the scratchpad:// link that opens it in the app
+scratchpad export ~/scratchpad-backup    # every draft as markdown; --zip for a single file
 scratchpad capture                       # open the capture window, from Raycast, a script or anything else
 ```
 
@@ -118,7 +119,7 @@ Agents can list, search, read, create, update and append to drafts, and archive,
 
 ## Your data
 
-Drafts live in `~/Library/Application Support/dev.unremarkable.scratchpad/` on macOS and `~/.local/share/scratchpad/` on Linux. There's no sync yet, and your drafts never leave your computer; the Mac app only checks GitHub for new versions. `scratchpad list --all` and `scratchpad show` get any draft back out as plain markdown.
+Drafts live in `~/Library/Application Support/dev.unremarkable.scratchpad/` on macOS and `~/.local/share/scratchpad/` on Linux. There's no sync yet, and your drafts never leave your computer; the Mac app only checks GitHub for new versions. To take everything with you, **File > Export All…** saves every draft as markdown in a zip, in Inbox, Archive and Trash folders, with a `drafts.json` that records ids and dates. **Export…** in the Draft menu saves a single draft as a `.md` file, and `scratchpad export` does the same as Export All from the terminal.
 
 ## Status
 
