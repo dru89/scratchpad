@@ -3,6 +3,9 @@
 # then `npm run package`. CI signs and notarizes the macOS build: with
 # CSC_LINK and CSC_KEY_PASSWORD set it signs, and with APPLE_ID,
 # APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID set it notarizes.
+#
+# electron-builder stays on 25: 26.15 fails to unlock its temporary signing
+# keychain on the macOS 26 runners.
 
 appId: dev.unremarkable.scratchpad
 productName: scratchpad
