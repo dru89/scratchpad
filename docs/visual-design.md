@@ -69,7 +69,7 @@ Two CodeMirror rules to keep in mind. CodeMirror mounts its own styles after `st
 
 ## Layout
 
-**Main window.** The sidebar (272px) is tabs, a filter and the list. The list is titles and times only: most titles are already sentences, so previews truncate to noise, and finding by content is what the filter and switcher are for. Snippets appear only while filtering, with matches highlighted. The filter's placeholder names its tab ("Filter Trash") so its scope is clear next to the switcher, which searches Inbox and Archive together.
+**Main window.** The sidebar (272px by default) is tabs, a filter and the list. Drag its edge to resize it, from 200px to 640px and never more than half the window; double-click the edge to go back to the default. Each row is the title, up to two lines of preview, and the time, the way Drafts lays out its list. The preview is the text after the title, stripped of markdown like a snippet; a draft that's only a title gets a shorter row. While filtering, the snippet around the match takes the preview's place, with matches highlighted. (An earlier pass showed titles only, on the theory that previews truncate to noise; in daily use the second and third lines were what told similar drafts apart.) The filter's placeholder names its tab ("Filter Trash") so its scope is clear next to the switcher, which searches Inbox and Archive together.
 
 **Capture window.** The toolbar sits at the bottom, under the editor, so the first line of text starts right under the native title bar and the actions sit where a composer puts Send. It has no title, because the first line is right there. It must work down to 320×200: below 460px the toggle labels drop, below 400px the Done keycap drops, and no action is ever hidden.
 

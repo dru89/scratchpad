@@ -113,6 +113,9 @@ fn summary_json(d: &DraftSummary) -> Value {
     if let Some(t) = d.trashed_at {
         v["trashed"] = json!(iso8601(t));
     }
+    if !d.preview.is_empty() {
+        v["preview"] = json!(d.preview);
+    }
     if let Some(s) = &d.snippet {
         v["snippet"] = json!(s);
     }

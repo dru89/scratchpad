@@ -8,6 +8,7 @@ export interface WindowPrefs {
   loadedAt?: number;
   float?: boolean;
   sidebar?: boolean;
+  sidebarWidth?: number;
 }
 
 export interface WindowInfo {
@@ -72,5 +73,7 @@ export interface DraftSummary {
   createdAt: number;
   modifiedAt: number;
   trashedAt?: number;
+  /** The text after the title, stripped of markdown. */
+  preview?: string;
   snippet?: string;
 }

@@ -161,6 +161,16 @@ pub fn is_older(a: &str, b: &str) -> bool {
     parts(a) < parts(b)
 }
 
+async fn wait_for_daemon(paths: &Paths) -> Result<UnixStream> {
+    for _ in 0..100 {
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        if let Ok(stream) = UnixStream::connect(&paths.socket).await {
+            return Ok(stream);
+        }
+    }
+    bail!("scratchpadd didn't start; see {}", paths.log().display())
+}
+
 #[cfg(test)]
 mod tests {
     use super::is_older;
@@ -172,14 +182,4 @@ mod tests {
         assert!(!is_older("0.1.2", "0.1.2"));
         assert!(!is_older("0.2.0", "0.1.9"));
     }
-}
-
-async fn wait_for_daemon(paths: &Paths) -> Result<UnixStream> {
-    for _ in 0..100 {
-        tokio::time::sleep(Duration::from_millis(30)).await;
-        if let Ok(stream) = UnixStream::connect(&paths.socket).await {
-            return Ok(stream);
-        }
-    }
-    bail!("scratchpadd didn't start; see {}", paths.log().display())
 }

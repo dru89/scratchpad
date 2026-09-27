@@ -13,10 +13,13 @@ use loro::{ExportMode, LoroDoc};
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use std::path::Path;
 
-const SCHEMA_VERSION: i64 = 1;
+/// 2 added drafts.preview.
+const SCHEMA_VERSION: i64 = 2;
 
 pub struct Store {
     conn: Connection,
+    /// The schema was upgraded and the index needs filling in again.
+    refresh_index: bool,
 }
 
 /// What the index holds for one draft.
@@ -24,6 +27,7 @@ pub struct Store {
 pub struct IndexRow {
     pub state: DraftState,
     pub title: String,
+    pub preview: String,
     pub created_at: i64,
     pub modified_at: i64,
     pub trashed_at: Option<i64>,
@@ -36,6 +40,7 @@ impl IndexRow {
         let row = IndexRow {
             state: meta.state,
             title: crate::title::title(&body),
+            preview: crate::title::preview(&body),
             created_at: meta.created_at,
             modified_at: meta.modified_at,
             trashed_at: meta.trashed_at,
@@ -100,6 +105,7 @@ impl Store {
                     id TEXT PRIMARY KEY REFERENCES docs(id) ON DELETE CASCADE,
                     state TEXT NOT NULL,
                     title TEXT NOT NULL,
+                    preview TEXT NOT NULL DEFAULT '',
                     created_at INTEGER NOT NULL,
                     modified_at INTEGER NOT NULL,
                     trashed_at INTEGER
@@ -110,10 +116,18 @@ impl Store {
                     id TEXT PRIMARY KEY,
                     deleted_at INTEGER NOT NULL
                 );
-                PRAGMA user_version = 1;",
+                PRAGMA user_version = 2;",
             )?;
         }
-        Ok(Store { conn })
+        // The index is derived from the documents, so a schema change is a
+        // new column plus a reindex (docs/design.md#storage).
+        let refresh_index = version == 1;
+        if version == 1 {
+            conn.execute_batch(
+                "ALTER TABLE drafts ADD COLUMN preview TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 2;",
+            )?;
+        }
+        Ok(Store { conn, refresh_index })
     }
 
     // ---- documents ------------------------------------------------------
@@ -184,10 +198,10 @@ impl Store {
     pub fn upsert_index(&mut self, id: &str, row: &IndexRow, body: Option<&str>) -> Result<()> {
         let tx = self.conn.transaction()?;
         tx.execute(
-            "INSERT INTO drafts (id, state, title, created_at, modified_at, trashed_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-             ON CONFLICT(id) DO UPDATE SET state = ?2, title = ?3, created_at = ?4, modified_at = ?5, trashed_at = ?6",
-            params![id, row.state.as_str(), row.title, row.created_at, row.modified_at, row.trashed_at],
+            "INSERT INTO drafts (id, state, title, preview, created_at, modified_at, trashed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(id) DO UPDATE SET state = ?2, title = ?3, preview = ?4, created_at = ?5, modified_at = ?6, trashed_at = ?7",
+            params![id, row.state.as_str(), row.title, row.preview, row.created_at, row.modified_at, row.trashed_at],
         )?;
         if let Some(body) = body {
             let rowid: i64 = tx.query_row("SELECT rowid FROM drafts WHERE id = ?1", [id], |r| r.get(0))?;
@@ -205,7 +219,7 @@ impl Store {
         Ok(self
             .conn
             .query_row(
-                "SELECT id, state, title, created_at, modified_at, trashed_at FROM drafts WHERE id = ?1",
+                "SELECT id, state, title, created_at, modified_at, trashed_at, preview FROM drafts WHERE id = ?1",
                 [id],
                 summary_from_row,
             )
@@ -222,7 +236,8 @@ impl Store {
         let terms = q.query.as_deref().map(search::terms).unwrap_or_default();
         let (long, short): (Vec<String>, Vec<String>) = terms.iter().cloned().partition(|t| search::is_indexable(t));
 
-        let mut sql = String::from("SELECT d.id, d.state, d.title, d.created_at, d.modified_at, d.trashed_at");
+        let mut sql =
+            String::from("SELECT d.id, d.state, d.title, d.created_at, d.modified_at, d.trashed_at, d.preview");
         let mut args: Vec<rusqlite::types::Value> = Vec::new();
         let searching = !terms.is_empty();
         if searching && !long.is_empty() {
@@ -253,7 +268,7 @@ impl Store {
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt.query_map(params_from_iter(args), |r| {
             let summary = summary_from_row(r)?;
-            let body: Option<String> = r.get(6)?;
+            let body: Option<String> = r.get(7)?;
             Ok((summary, body))
         })?;
         let mut out = Vec::new();
@@ -303,6 +318,11 @@ impl Store {
         Ok(stmt.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?)
     }
 
+    /// Whether opening upgraded the schema, so every draft needs reindexing.
+    pub fn index_needs_refresh(&self) -> bool {
+        self.refresh_index
+    }
+
     pub fn indexed_count(&self) -> Result<i64> {
         Ok(self.conn.query_row("SELECT count(*) FROM drafts", [], |r| r.get(0))?)
     }
@@ -318,6 +338,7 @@ fn summary_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<DraftSummary> {
         created_at: r.get(3)?,
         modified_at: r.get(4)?,
         trashed_at: r.get(5)?,
+        preview: r.get(6)?,
         snippet: None,
     })
 }
@@ -336,6 +357,32 @@ mod tests {
 
     fn ids(list: &[DraftSummary]) -> Vec<&str> {
         list.iter().map(|s| s.id.as_str()).collect()
+    }
+
+    #[test]
+    fn lists_carry_previews() {
+        let mut s = Store::open_in_memory().unwrap();
+        add(&mut s, "A", "# Groceries\n\n- milk\n- eggs", DraftState::Inbox, 100);
+        add(&mut s, "B", "Only a title", DraftState::Inbox, 200);
+        let (hits, _) = s.list(&ListQuery { limit: 10, ..Default::default() }).unwrap();
+        assert_eq!(hits[1].preview, "milk · eggs");
+        assert_eq!(hits[0].preview, "");
+        assert_eq!(s.summary("A").unwrap().unwrap().preview, "milk · eggs");
+    }
+
+    #[test]
+    fn a_version_1_database_gets_previews() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE drafts (id TEXT PRIMARY KEY, state TEXT NOT NULL, title TEXT NOT NULL,
+                created_at INTEGER NOT NULL, modified_at INTEGER NOT NULL, trashed_at INTEGER);
+             PRAGMA user_version = 1;",
+        )
+        .unwrap();
+        let s = Store::init(conn).unwrap();
+        assert!(s.index_needs_refresh());
+        s.conn.prepare("SELECT preview FROM drafts").unwrap();
+        assert!(!Store::open_in_memory().unwrap().index_needs_refresh());
     }
 
     #[test]

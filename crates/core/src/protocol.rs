@@ -52,6 +52,9 @@ pub struct DraftSummary {
     pub modified_at: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trashed_at: Option<i64>,
+    /// The text after the title, stripped of markdown, for list rows.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub preview: String,
     /// Present in search results: text around the first match.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snippet: Option<String>,

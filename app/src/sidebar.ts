@@ -227,10 +227,12 @@ export class Sidebar {
     this.listEl.innerHTML = this.items
       .map((d) => {
         const selected = d.id === this.controller.draftId ? ' selected' : '';
-        const snippet = d.snippet ? `<div class="item-snippet">${markMatches(d.snippet, terms)}</div>` : '';
+        // While filtering, the text around the match takes the preview's place.
+        const text = d.snippet ? markMatches(d.snippet, terms) : escapeHtml(d.preview ?? '');
         return `<div class="item${selected}" data-id="${d.id}" role="option" tabindex="0">
-          <div class="item-row"><span class="item-title">${markMatches(d.title, terms)}</span><span class="item-time">${relativeTime(d.modifiedAt, now)}</span></div>
-          ${snippet}
+          <div class="item-title">${markMatches(d.title, terms)}</div>
+          ${text ? `<div class="item-snippet">${text}</div>` : ''}
+          <div class="item-time">${relativeTime(d.modifiedAt, now)}</div>
         </div>`;
       })
       .join('');

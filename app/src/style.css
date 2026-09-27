@@ -211,7 +211,8 @@ button {
 
 .app {
   display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  /* Never more than half the window, however wide it was dragged. */
+  grid-template-columns: min(var(--sidebar-width), 50vw) minmax(0, 1fr);
   height: 100vh;
 }
 
@@ -441,11 +442,45 @@ body.no-sidebar .sidebar {
 /* ---- sidebar -------------------------------------------------------------- */
 
 .sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: var(--paper-side);
   border-right: 1px solid var(--line);
+}
+
+/* The edge you drag to resize: a wide target over the border, which turns
+   into a stronger line on hover and while dragging. */
+.sidebar-resize {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 5;
+  width: 8px;
+  cursor: col-resize;
+  outline: none;
+}
+
+.sidebar-resize::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+}
+
+.sidebar-resize:hover::after,
+.sidebar-resize:focus-visible::after,
+body.resizing .sidebar-resize::after {
+  background: var(--line-strong);
+}
+
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .tabs {
@@ -551,7 +586,7 @@ input[type='search']::-webkit-search-cancel-button {
 
 .item,
 .switcher-item {
-  padding: 6px 10px;
+  padding: 7px 10px;
   border-radius: var(--radius-md);
   cursor: default;
   outline: none;
@@ -585,6 +620,7 @@ input[type='search']::-webkit-search-cancel-button {
 .item-title {
   flex: 1;
   min-width: 0;
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -600,6 +636,13 @@ input[type='search']::-webkit-search-cancel-button {
   font-size: 12px;
   line-height: 16px;
   font-variant-numeric: tabular-nums;
+}
+
+/* A sidebar row: title, up to two lines of preview (or the snippet around a
+   match while filtering), then the time. */
+.item .item-time {
+  display: block;
+  margin-top: 3px;
 }
 
 .item-snippet {

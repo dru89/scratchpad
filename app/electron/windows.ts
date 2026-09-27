@@ -17,6 +17,7 @@ export interface WindowPrefs {
   loadedAt?: number;
   float?: boolean;
   sidebar?: boolean;
+  sidebarWidth?: number;
   width?: number;
   height?: number;
 }

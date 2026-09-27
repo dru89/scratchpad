@@ -308,6 +308,29 @@ test.describe.serial('scratchpad app', () => {
     await expect.poll(() => run('show', id)).toBe('Errands\n\n- [ ] milk\n- [x] stamps\n');
   });
 
+  test('sidebar rows preview the text after the title', async () => {
+    const main = await windowOf('main');
+    run('new', '# Trip\n\n- pack the **charger**\n- passport');
+    const row = main.locator('#sidebar .item', { hasText: 'Trip' });
+    await expect(row.locator('.item-snippet')).toHaveText('pack the charger · passport');
+  });
+
+  test('dragging the sidebar edge resizes it, and double-clicking resets it', async () => {
+    const main = await windowOf('main');
+    const sidebar = main.locator('#sidebar');
+    const width = async () => Math.round((await sidebar.boundingBox())!.width);
+    const before = await width();
+    const edge = (await main.locator('.sidebar-resize').boundingBox())!;
+    const x = edge.x + edge.width / 2;
+    await main.mouse.move(x, edge.y + 300);
+    await main.mouse.down();
+    await main.mouse.move(x + 80, edge.y + 300, { steps: 6 });
+    await main.mouse.up();
+    await expect.poll(async () => Math.abs((await width()) - (before + 80))).toBeLessThanOrEqual(2);
+    await main.locator('.sidebar-resize').dblclick();
+    await expect.poll(width).toBe(272);
+  });
+
   test('toolbar buttons explain themselves on hover', async () => {
     const main = await windowOf('main');
     await main.locator('.toolbar .tool[data-action="pin"]').hover();

@@ -13,7 +13,7 @@ It's inspired by [Drafts](https://getdrafts.com), and it runs on macOS and Linux
 
 ## What it does
 
-**No filing.** There are no folders, file names or tags. Every draft lives in the Inbox, newest first, and its title is its first line. When you're done with a draft, archive it. The Trash empties itself after 30 days.
+**No filing.** There are no folders, file names or tags. Every draft lives in the Inbox, newest first, with its first line as its title and a glimpse of what follows. When you're done with a draft, archive it. The Trash empties itself after 30 days.
 
 **Markdown, shown as it will look.** Type markdown and it renders in place: headings, bold and italics, links, lists, task lists, quotes, code and tables. The syntax comes back only where your cursor is, so you can still edit it, and the text underneath is always plain markdown, ready to paste anywhere.
 

@@ -107,6 +107,7 @@ fn summary_from_doc(id: &str, doc: &LoroDoc) -> DraftSummary {
         created_at: row.created_at,
         modified_at: row.modified_at,
         trashed_at: row.trashed_at,
+        preview: row.preview,
         snippet: None,
     }
 }
@@ -132,10 +133,11 @@ impl Daemon {
     }
 
     /// Rebuilds the index if it has drifted from the stored documents, for
-    /// example after a crash between writing a draft and indexing it.
+    /// example after a crash between writing a draft and indexing it, or
+    /// after a schema upgrade added a column.
     fn repair_index(&mut self) -> anyhow::Result<()> {
         let ids = self.store.all_ids()?;
-        if self.store.indexed_count()? as usize == ids.len() {
+        if self.store.indexed_count()? as usize == ids.len() && !self.store.index_needs_refresh() {
             return Ok(());
         }
         for id in ids {

@@ -10,10 +10,11 @@ Where scratchpad stands and what comes next. [`design.md`](design.md) covers how
 4. **The desktop app on Linux.** [`app/`](../app/), developed on KDE Plasma on Wayland.
 5. **The desktop app on macOS.** The same app, signed and notarized in CI, with its own capture hotkey, and updates from GitHub Releases. Apple silicon only, since current macOS no longer runs on Intel Macs.
 6. **Links and the Draft menu.** `scratchpad://` links, copying a draft's link, ID, title or contents, Duplicate, Get Info and Empty Trash.
+7. **Sidebar previews.** Each row shows two lines of the text after the title, and the sidebar resizes.
 
 ## Next
 
-1. **Export and sidebar previews.** `scratchpad export <dir>`, which [`design.md`](design.md) already promises, and a second line of preview text under each title in the sidebar.
+1. **Export.** `scratchpad export <dir>`, which [`design.md`](design.md) already promises.
 2. **Daily use.** Use it in place of Drafts on Linux and macOS for a while, and fix what that turns up.
 3. **Sync.** A small Rust server that stores opaque, ordered records and never sees plaintext, so it's safe to host anywhere. Clients encrypt with Loro's `%ELO` protocol extension and do all merging and compaction themselves. An Argon2id passphrase wraps an account key, which wraps per-draft keys, and new devices enroll Bitwarden-style, by public-key handoff or QR code. Purged drafts leave tombstones that sync. The background research is in [`research.md`](research.md#sync).
 4. **Versions.** Named checkpoints you can go back to, the way Drafts saves a version when you press ⌘S, not every change the CRDT records. Loro keeps the history, so this is mostly deciding when a version is taken and building the browser for them.

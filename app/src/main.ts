@@ -9,6 +9,7 @@ import { escapeHtml } from './format';
 import { type IconName, icon } from './icons';
 import { InfoPanel } from './info';
 import { Rpc } from './rpc';
+import { installSidebarResize } from './resize';
 import { Sidebar } from './sidebar';
 import { Switcher } from './switcher';
 import { installTooltips } from './tooltip';
@@ -79,6 +80,9 @@ async function start() {
     kind === 'main'
       ? new Sidebar(document.getElementById('sidebar')!, rpc, controller, { toast: (m) => toast(m), info: showInfo })
       : null;
+  if (kind === 'main') {
+    installSidebarResize(document.getElementById('sidebar')!, info.prefs.sidebarWidth, (sidebarWidth) => void bridge().savePrefs({ sidebarWidth }));
+  }
 
   const setState = async (state: DraftState, message: string, iconName: IconName) => {
     await controller.setState(state);

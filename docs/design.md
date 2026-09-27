@@ -77,7 +77,7 @@ The daemon uses one SQLite database (WAL mode):
 
 - `docs`: the id and the latest Loro snapshot.
 - `doc_updates`: every Loro update since that snapshot, one row per change, so a keystroke's worth of typing is on disk before its reply goes out. A draft's updates are folded into a new snapshot after 500 of them or 512 KB.
-- `drafts`: the index used for lists, holding id, state, title, createdAt, modifiedAt and trashedAt.
+- `drafts`: the index used for lists, holding id, state, title, preview (the text after the title, stripped of markdown), createdAt, modifiedAt and trashedAt.
 - `drafts_fts`: an FTS5 table using the trigram tokenizer, over each draft's title and plain text.
 - `tombstones`: id and deletedAt.
 
@@ -103,7 +103,7 @@ Every `id` parameter accepts a full id or any unique prefix of one, case-insensi
 
 | method | params | result / notes |
 | --- | --- | --- |
-| `drafts.list` | `states?` (default `["inbox"]`), `query?`, `limit?` (default 100), `cursor?` | Summaries (id, title, state, createdAt, modifiedAt, trashedAt, and a snippet when searching), newest `modifiedAt` first, plus `nextCursor` when there's more. |
+| `drafts.list` | `states?` (default `["inbox"]`), `query?`, `limit?` (default 100), `cursor?` | Summaries (id, title, preview, state, createdAt, modifiedAt, trashedAt, and a snippet when searching), newest `modifiedAt` first, plus `nextCursor` when there's more. |
 | `drafts.get` | `id`, `knownVersion?` | The summary, the body as plain text, the whole `meta` map, and `version`. If `knownVersion` matches the current version, the reply is the summary plus `unchanged: true`, without the text. |
 | `drafts.create` | `text?`, `state?` | The new draft's summary and `version`. |
 | `drafts.setText` | `id`, `text`, `baseVersion?` | Replaces the body with a minimal diff. With `baseVersion` (from `drafts.get`), the diff is taken against that version and merged, so text written since, by you in the app, say, survives an agent's revision. Without it, the text replaces whatever the draft holds now. Returns the new `version` and `merged`: `false` means the draft is now exactly the caller's text and the version can be used for its next edit; `true` means other edits were combined in, so the caller should read again. |
