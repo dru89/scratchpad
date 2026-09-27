@@ -14,9 +14,13 @@ export const binDir = packaged
   : join(__dirname, '..', '..', 'target', 'debug');
 
 export function launch(env: Record<string, string>) {
-  if (packaged) return electron.launch({ executablePath: packaged, env });
+  // SCRATCHPAD_E2E_SCALE renders at that device scale, for sharp screenshots
+  // from a virtual display.
+  const scale = process.env.SCRATCHPAD_E2E_SCALE;
+  const args = scale ? [`--force-device-scale-factor=${scale}`] : [];
+  if (packaged) return electron.launch({ executablePath: packaged, args, env });
   // On Linux: Wayland normally, X11 when there's no Wayland display, as under
   // `npm run test:e2e:headless`, which keeps the run off your screen.
-  const args = process.platform === 'linux' ? [`--ozone-platform=${process.env.WAYLAND_DISPLAY ? 'wayland' : 'x11'}`] : [];
+  if (process.platform === 'linux') args.push(`--ozone-platform=${process.env.WAYLAND_DISPLAY ? 'wayland' : 'x11'}`);
   return electron.launch({ args: [...args, '.'], cwd: resolve(__dirname, '..'), env });
 }

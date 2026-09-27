@@ -35,10 +35,12 @@ jobs:
         working-directory: app
       - run: npm run typecheck && npm test
         working-directory: app
-      # Electron's sandbox helper has to be setuid root, which npm can't do.
+      # Electron downloads its binary on first use; fetch it now, then make
+      # its sandbox helper setuid root, which npm can't do.
       - name: Prepare Electron and Xvfb
         working-directory: app
         run: |
+          node node_modules/electron/install.js
           sudo chown root node_modules/electron/dist/chrome-sandbox
           sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
           command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)

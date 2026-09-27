@@ -138,7 +138,7 @@ fn capture_starts_the_app_when_it_isnt_running() {
 fn edit_writes_back_through_the_editor() {
     let env = Env::new();
     let id = env.ok(&["new", "alpha beta"]).trim().to_string();
-    let out = env.cmd().args(["edit", &id]).env("VISUAL", "sed -i s/alpha/ALPHA/").output().unwrap();
+    let out = env.cmd().args(["edit", &id]).env("VISUAL", "sed -i.bak s/alpha/ALPHA/").output().unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(env.ok(&["show", &id]), "ALPHA beta\n");
 
