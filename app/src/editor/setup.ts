@@ -7,7 +7,7 @@ import { search, searchKeymap } from '@codemirror/search';
 import type { Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap, placeholder, type ViewUpdate } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
-import { createFindPanel, openReplace } from './find';
+import { createFindPanel, openReplace, REPLACE_KEY } from './find';
 import { livePreview } from './livepreview';
 import { tables } from './tables';
 
@@ -46,7 +46,7 @@ export function editorExtensions(opts: { placeholder: string; onUpdate: (u: View
   return [
     drawSelection(),
     search({ top: true, createPanel: createFindPanel }),
-    keymap.of([{ key: 'Mod-h', run: openReplace, scope: 'editor search-panel' }, ...searchKeymap, ...defaultKeymap]),
+    keymap.of([{ ...REPLACE_KEY, run: openReplace, scope: 'editor search-panel' }, ...searchKeymap, ...defaultKeymap]),
     markdown({ base: markdownLanguage }),
     syntaxHighlighting(highlight),
     theme,

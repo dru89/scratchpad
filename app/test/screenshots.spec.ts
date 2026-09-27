@@ -3,22 +3,19 @@
 //
 //   npm run screenshots        (writes to docs/design-handoff/screenshots)
 
-import { _electron as electron, type ElectronApplication, expect, type Page, test } from '@playwright/test';
+import { type ElectronApplication, expect, type Page, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { LoroDoc } from 'loro-crdt';
+import { binDir, launch } from './launch';
 
 const out = process.env.SCRATCHPAD_SCREENSHOTS;
 test.skip(!out, 'set SCRATCHPAD_SCREENSHOTS to write screenshots');
 
-const repo = resolve(__dirname, '..', '..');
-// Wayland normally; X11 when there's no Wayland display, as under
-// `npm run test:e2e:headless`, which keeps the run off your screen.
-const platform = process.env.WAYLAND_DISPLAY ? 'wayland' : 'x11';
-const cli = join(repo, 'target', 'debug', 'scratchpad');
+const cli = join(binDir, 'scratchpad');
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
@@ -191,7 +188,7 @@ test.describe.serial('design screenshots', () => {
     // A daemon wrapper that refuses to start while a block file exists, so
     // the offline state can be held long enough to photograph.
     const wrapper = join(dir, 'daemon');
-    writeFileSync(wrapper, `#!/bin/sh\n[ -e "${dir}/block" ] && exit 1\nexec "${join(repo, 'target', 'debug', 'scratchpadd')}"\n`);
+    writeFileSync(wrapper, `#!/bin/sh\n[ -e "${dir}/block" ] && exit 1\nexec "${join(binDir, 'scratchpadd')}"\n`);
     chmodSync(wrapper, 0o755);
     env = {
       ...(process.env as Record<string, string>),
@@ -201,7 +198,7 @@ test.describe.serial('design screenshots', () => {
       SCRATCHPAD_DAEMON: wrapper,
     };
     run('daemon', 'start');
-    app = await electron.launch({ args: [`--ozone-platform=${platform}`, '.'], cwd: resolve(__dirname, '..'), env });
+    app = await launch(env);
   });
 
   test.afterAll(async () => {
@@ -224,7 +221,7 @@ test.describe.serial('design screenshots', () => {
     await shot(main, '01-empty-inbox');
 
     for (const d of DRAFTS) await seed(d);
-    await main.keyboard.press('Control+1');
+    await main.keyboard.press('ControlOrMeta+1');
     await expect
       .poll(() => main.locator('.item-title').allInnerTexts())
       .toEqual(['Q4 planning notes', 'Reply to Sam about the offsite', 'Standup, Tuesday', 'Why I keep a scratchpad', 'Groceries', 'Talk outline: local-first sync', 'Gift ideas']);
@@ -243,9 +240,9 @@ test.describe.serial('design screenshots', () => {
     // Long-form writing, sidebar hidden.
     await main.locator('#sidebar .item-title', { hasText: 'Why I keep a scratchpad' }).click();
     await cursorAtEndOf(main, 'So the rule is simple');
-    await main.keyboard.press('Control+\\');
+    await main.keyboard.press('ControlOrMeta+\\');
     await shot(main, '05-focused-writing-no-sidebar');
-    await main.keyboard.press('Control+\\');
+    await main.keyboard.press('ControlOrMeta+\\');
 
     // Filtering the sidebar shows snippets around the match.
     await main.locator('.filter').fill('sync');
@@ -257,7 +254,7 @@ test.describe.serial('design screenshots', () => {
     // The quick switcher.
     await main.locator('#sidebar .item-title', { hasText: 'Q4 planning notes' }).click();
     await cursorAtEndOf(main, 'Three things to settle');
-    await main.keyboard.press('Control+k');
+    await main.keyboard.press('ControlOrMeta+k');
     await main.keyboard.type('offsite');
     await expect(main.locator('.switcher-item').first()).toBeVisible();
     await shot(main, '07-quick-switcher');
@@ -266,24 +263,24 @@ test.describe.serial('design screenshots', () => {
 
     // Find in the draft (CodeMirror's panel, unstyled so far).
     await cursorAtEndOf(main, 'Three things to settle');
-    await main.keyboard.press('Control+f');
+    await main.keyboard.press('ControlOrMeta+f');
     await main.keyboard.type('sync');
     await shot(main, '09-find-in-draft');
     await main.keyboard.press('Escape');
 
     // Copy as rich text, and its toast.
     await cursorAtEndOf(main, 'Three things to settle');
-    await main.keyboard.press('Control+Shift+C');
+    await main.keyboard.press('ControlOrMeta+Shift+C');
     await expect(main.locator('#toast')).toBeVisible();
     await shot(main, '10-copied-as-rich-text-toast');
     await expect(main.locator('#toast')).toBeHidden({ timeout: 5000 });
 
     // The Trash, with a trashed draft open.
-    await main.keyboard.press('Control+3');
+    await main.keyboard.press('ControlOrMeta+3');
     await main.locator('#sidebar .item-title', { hasText: 'meeting at 3' }).click();
     await expect(main.locator('.badge', { hasText: 'In Trash' })).toBeVisible();
     await shot(main, '11-trash-tab-with-badge');
-    await main.keyboard.press('Control+1');
+    await main.keyboard.press('ControlOrMeta+1');
 
     // Offline: the daemon went away and can't come back yet.
     await main.locator('#sidebar .item-title', { hasText: 'Reply to Sam' }).click();
@@ -304,7 +301,7 @@ test.describe.serial('design screenshots', () => {
     await capture.locator('.cm-content').click();
     await capture.keyboard.type('Idea: the capture window should remember its size per monitor\n\n');
     await capture.keyboard.type('- ask Priya whether KWin exposes that');
-    await capture.keyboard.press('Control+Shift+P');
+    await capture.keyboard.press('ControlOrMeta+Shift+P');
     await capture.waitForTimeout(2200); // let the pin toast clear
     await shot(capture, '14-capture-window-pinned-and-floating');
     await shot(capture, '15-capture-window-dark', 'dark');

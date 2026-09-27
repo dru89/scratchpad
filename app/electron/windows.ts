@@ -21,10 +21,19 @@ export interface WindowPrefs {
   height?: number;
 }
 
+/** App-wide flags, kept under the "app" key. */
+export interface AppPrefs {
+  /** Open at Login was turned on at first launch; after that it's the user's to change. */
+  loginItemSet?: boolean;
+}
+
+type Prefs = WindowPrefs & AppPrefs;
+
 const DEFAULT_SIZE: Record<Kind, [number, number]> = { main: [1100, 780], capture: [560, 380], draft: [760, 720] };
+const isMac = process.platform === 'darwin';
 
 export class StateStore {
-  private data: Record<string, WindowPrefs> = {};
+  private data: Record<string, Prefs> = {};
   private timer: NodeJS.Timeout | null = null;
   private file = join(app.getPath('userData'), 'state.json');
 
@@ -36,11 +45,11 @@ export class StateStore {
     }
   }
 
-  get(key: string): WindowPrefs {
+  get(key: string): Prefs {
     return this.data[key] ?? (key === 'capture' ? { float: true } : {});
   }
 
-  update(key: string, patch: WindowPrefs) {
+  update(key: string, patch: Prefs) {
     this.data[key] = { ...this.get(key), ...patch };
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => this.flush(), 300);
@@ -107,6 +116,9 @@ export class Windows {
         backgroundThrottling: kind !== 'capture',
       },
     });
+    // On macOS the capture window can come up over a full-screen app, as a
+    // panel does. Set once here: each call briefly hides the Dock icon.
+    if (isMac && kind === 'capture') win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     const m: Managed = { win, kind, key, link: null };
     const contentsId = win.webContents.id;
     this.byContents.set(contentsId, m);
@@ -136,7 +148,8 @@ export class Windows {
       win.on('close', (e) => {
         if (this.quitting) return;
         e.preventDefault();
-        win.hide();
+        if (kind === 'capture') this.hide(m);
+        else win.hide();
       });
     }
     win.on('show', () => {
@@ -182,9 +195,23 @@ export class Windows {
     m.win.close();
   }
 
-  /** Shows and focuses a window. On KDE Wayland, KWin has to do the focusing. */
+  /**
+   * Hides a window. On macOS, when that leaves nothing showing, the app hides
+   * too, so focus goes back to whatever you were typing in before the hotkey.
+   */
+  hide(m: Managed) {
+    m.win.hide();
+    if (isMac && !BrowserWindow.getAllWindows().some((w) => w.isVisible())) app.hide();
+  }
+
+  /**
+   * Shows and focuses a window. On KDE Wayland, KWin has to do the focusing;
+   * on macOS, the app has to be brought forward from behind the one in use.
+   */
   private present(m: Managed) {
+    if (isMac) app.show();
     m.win.show();
+    if (isMac) app.focus({ steal: true });
     m.win.focus();
     if (useKwin()) {
       setTimeout(() => {

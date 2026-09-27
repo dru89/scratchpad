@@ -5,7 +5,7 @@
 
 import type { WindowKind } from './bridge';
 import type { DraftController } from './controller';
-import { escapeHtml, kbd } from './format';
+import { escapeHtml, kbd, shortcut } from './format';
 import { type IconName, icon } from './icons';
 
 export interface Actions {
@@ -19,8 +19,6 @@ export interface Actions {
   trash(): void;
   openWindow(): void;
 }
-
-const mod = navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl+';
 
 interface Tool {
   action: keyof Actions;
@@ -76,7 +74,7 @@ export class Toolbar {
       action: 'pin',
       icon: 'pin',
       label: pinned ? 'Unpin' : 'Pin: keep this draft when you come back',
-      keys: `${mod}Shift+P`,
+      keys: shortcut('Mod+Shift+P'),
       pressed: pinned,
       text: capture && pinned ? 'Pinned' : '',
     });
@@ -84,16 +82,16 @@ export class Toolbar {
       action: 'float',
       icon: 'float',
       label: floating ? 'Stop floating on top' : 'Float on top',
-      keys: `${mod}Shift+F`,
+      keys: shortcut('Mod+Shift+F'),
       pressed: floating,
       text: capture && floating ? 'On top' : '',
     });
-    const copy = tool({ action: 'copyRich', icon: 'copy', label: 'Copy as rich text', keys: `${mod}Shift+C`, disabled: noDraft });
+    const copy = tool({ action: 'copyRich', icon: 'copy', label: 'Copy as rich text', keys: shortcut('Mod+Shift+C'), disabled: noDraft });
     const archive = tool({
       action: 'archive',
       icon: 'archive',
       label: archived ? 'Move to Inbox' : 'Archive',
-      keys: `${mod}Shift+A`,
+      keys: shortcut('Mod+Shift+A'),
       pressed: archived,
       disabled: noDraft,
     });
@@ -101,11 +99,11 @@ export class Toolbar {
       action: 'trash',
       icon: 'trash',
       label: trashed ? 'Restore from Trash' : 'Move to Trash',
-      keys: `${mod}Shift+Backspace`,
+      keys: shortcut('Mod+Shift+Backspace'),
       pressed: trashed,
       disabled: noDraft,
     });
-    const openWindow = tool({ action: 'openWindow', icon: 'window', label: 'Open in its own window', keys: `${mod}Shift+O`, disabled: noDraft });
+    const openWindow = tool({ action: 'openWindow', icon: 'window', label: 'Open in its own window', keys: shortcut('Mod+Shift+O'), disabled: noDraft });
 
     let badges = '';
     if (archived) badges += badge('Archived', { lead: icon('archive', 13) });
@@ -121,14 +119,14 @@ export class Toolbar {
     const title = `<div class="toolbar-title">${capture ? '' : `<span class="title-text">${escapeHtml(c.title)}</span>`}${badges}</div>`;
 
     if (capture) {
-      const done = `<button class="btn" data-action="done" title="Done: file it and start fresh (${mod}Enter)">${icon('done')}Done${kbd('Mod+Enter')}</button>`;
+      const done = `<button class="btn" data-action="done" title="Done: file it and start fresh (${shortcut('Mod+Enter')})">${icon('done')}Done${kbd('Mod+Enter')}</button>`;
       this.el.innerHTML = `${group(pin, float)}${title}<div class="tools">${group(copy, archive, trash, openWindow)}${done}</div>`;
     } else if (kind === 'draft') {
       this.el.innerHTML = `${title}<div class="tools">${group(float)}${group(copy)}${group(archive, trash)}</div>`;
     } else {
       const lead = group(
-        tool({ action: 'toggleSidebar', icon: 'sidebar', label: 'Toggle sidebar', keys: `${mod}\\` }),
-        tool({ action: 'newDraft', icon: 'new', label: 'New draft', keys: `${mod}N` }),
+        tool({ action: 'toggleSidebar', icon: 'sidebar', label: 'Toggle sidebar', keys: shortcut('Mod+\\') }),
+        tool({ action: 'newDraft', icon: 'new', label: 'New draft', keys: shortcut('Mod+N') }),
       );
       this.el.innerHTML = `${lead}${title}<div class="tools">${group(pin, float)}${group(copy)}${group(archive, trash)}${group(openWindow)}</div>`;
     }

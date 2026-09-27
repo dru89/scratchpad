@@ -1,5 +1,6 @@
 // Find in draft (Ctrl+F): one slim row in CodeMirror's top panel slot, with
-// replace on a second row that opens with Ctrl+H or its toggle. Replaces
+// replace on a second row that opens with Ctrl+H (⌘⌥F on macOS, where ⌘H
+// hides the app) or its toggle. Replaces
 // CodeMirror's default panel; the search itself is still @codemirror/search.
 
 import {
@@ -14,8 +15,12 @@ import {
   setSearchQuery,
 } from '@codemirror/search';
 import { type EditorView, type Panel, runScopeHandlers, type ViewUpdate } from '@codemirror/view';
-import { escapeHtml } from '../format';
+import { escapeHtml, isMac, shortcut } from '../format';
 import { icon } from '../icons';
+
+/** Opens the replace row: Ctrl+H, or ⌘⌥F on macOS, where ⌘H hides the app. */
+export const REPLACE_KEY = { key: 'Mod-h', mac: 'Mod-Alt-f' };
+const REPLACE_KEYS = shortcut(isMac ? 'Mod+Alt+F' : 'Mod+H');
 
 /** Stop counting here, so a long draft with a common query stays cheap. */
 const MAX_COUNT = 999;
@@ -70,7 +75,7 @@ class FindPanel implements Panel {
         ${tool('prev', 'up', 'Previous match (Shift+Enter)')}
         ${tool('next', 'down', 'Next match (Enter)')}
         <span class="find-spacer"></span>
-        ${tool('toggle-replace', 'replace', 'Replace (Ctrl+H)')}
+        ${tool('toggle-replace', 'replace', `Replace (${REPLACE_KEYS})`)}
         ${tool('close', 'close', 'Close (Esc)')}
       </div>
       <div class="find-row" hidden>

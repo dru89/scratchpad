@@ -4,7 +4,7 @@
 
 import { bridge, type DraftState, type DraftSummary } from './bridge';
 import type { DraftController } from './controller';
-import { escapeHtml, kbd, markMatches, relativeTime, searchTerms } from './format';
+import { escapeHtml, kbd, markMatches, relativeTime, searchTerms, shortcut } from './format';
 import { icon } from './icons';
 import type { Rpc } from './rpc';
 
@@ -184,7 +184,7 @@ export class Sidebar {
   private renderTabs() {
     this.tabsEl.innerHTML = TABS.map(
       (t, n) =>
-        `<button class="tab${t.state === this.tab ? ' active' : ''}" data-tab="${t.state}" role="tab" aria-selected="${t.state === this.tab}" title="${t.label} (Ctrl+${n + 1})">${t.label}</button>`,
+        `<button class="tab${t.state === this.tab ? ' active' : ''}" data-tab="${t.state}" role="tab" aria-selected="${t.state === this.tab}" title="${t.label} (${shortcut(`Mod+${n + 1}`)})">${t.label}</button>`,
     ).join('');
     this.filterEl.placeholder = `Filter ${label(this.tab)}`;
   }

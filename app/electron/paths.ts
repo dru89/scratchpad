@@ -25,7 +25,7 @@ export function socketPath(): string {
 export function daemonBinary(): string {
   if (process.env.SCRATCHPAD_DAEMON) return process.env.SCRATCHPAD_DAEMON;
   const candidates = [
-    process.resourcesPath && join(process.resourcesPath, 'scratchpadd'),
+    process.resourcesPath && join(process.resourcesPath, 'bin', 'scratchpadd'),
     join(homedir(), '.local', 'bin', 'scratchpadd'),
     join(homedir(), '.cargo', 'bin', 'scratchpadd'),
   ].filter((p): p is string => Boolean(p));

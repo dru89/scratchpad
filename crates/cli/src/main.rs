@@ -263,9 +263,22 @@ fn is_no_app(e: &anyhow::Error) -> bool {
 }
 
 /// Starts the app when it isn't running, so the capture hotkey always works:
-/// $SCRATCHPAD_APP, else `scratchpad-app` on the PATH or in ~/.local/bin.
+/// $SCRATCHPAD_APP, else the installed app on macOS, else `scratchpad-app` on
+/// the PATH or in ~/.local/bin.
 fn launch_app(args: &[String]) -> Result<()> {
     use std::os::unix::process::CommandExt;
+    // On macOS, the installed app, found by its bundle id.
+    if cfg!(target_os = "macos") && std::env::var_os("SCRATCHPAD_APP").is_none() {
+        let opened = std::process::Command::new("open")
+            .args(["-b", "dev.unremarkable.scratchpad", "--args"])
+            .args(args)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        if opened.is_ok_and(|s| s.success()) {
+            return Ok(());
+        }
+    }
     let app = std::env::var_os("SCRATCHPAD_APP").map(std::path::PathBuf::from).or_else(|| {
         let on_path = std::env::var_os("PATH")
             .into_iter()

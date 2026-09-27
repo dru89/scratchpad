@@ -1,0 +1,42 @@
+# Packages the app with the daemon and CLI inside it. Build the Rust
+# binaries first (cargo build --release --bin scratchpadd --bin scratchpad),
+# then `npm run package`. CI signs and notarizes the macOS build: with
+# CSC_LINK and CSC_KEY_PASSWORD set it signs, and with APPLE_ID,
+# APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID set it notarizes.
+
+appId: dev.unremarkable.scratchpad
+productName: scratchpad
+copyright: Copyright © 2026 Drew Hays
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist-electron/**
+  - dist-renderer/**
+  - package.json
+# The app looks for the daemon here (electron/paths.ts), and the CLI finds
+# the daemon beside itself.
+extraResources:
+  - from: ../target/release/scratchpadd
+    to: bin/scratchpadd
+  - from: ../target/release/scratchpad
+    to: bin/scratchpad
+
+mac:
+  category: public.app-category.productivity
+  # Apple silicon only, for now; an Intel build would need the Rust binaries
+  # for x86_64 as well.
+  target:
+    - target: dmg
+      arch: arm64
+    - target: zip
+      arch: arm64
+  hardenedRuntime: true
+  # Signed like the app itself, so the hardened runtime accepts them.
+  binaries:
+    - Contents/Resources/bin/scratchpadd
+    - Contents/Resources/bin/scratchpad
+
+linux:
+  target: dir
+  category: Utility

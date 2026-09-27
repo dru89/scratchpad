@@ -1,0 +1,137 @@
+name: Build
+
+# Tests on Linux and macOS, and a macOS build from every run: signed and
+# notarized except on pull requests, which can't see the signing secrets.
+# A v* tag also publishes the build as a GitHub Release.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: cargo test --workspace --locked
+      - run: cargo build --workspace --locked
+
+      - run: npm ci
+        working-directory: app
+      - run: npm run typecheck && npm test
+        working-directory: app
+      # Electron's sandbox helper has to be setuid root, which npm can't do.
+      - name: Prepare Electron and Xvfb
+        working-directory: app
+        run: |
+          sudo chown root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+          command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
+      - run: npm run test:e2e:headless
+        working-directory: app
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: test-results-linux
+          path: app/test-results
+          retention-days: 7
+
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: cargo test --workspace --locked
+      - run: cargo build --release --locked --bin scratchpadd --bin scratchpad
+
+      - run: npm ci
+        working-directory: app
+      - run: npm run typecheck && npm test
+        working-directory: app
+
+      - name: Package
+        working-directory: app
+        env:
+          SIGN: ${{ github.event_name != 'pull_request' }}
+          CSC_LINK: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # Missing secrets arrive as empty variables, and electron-builder
+        # reads an empty CSC_LINK as a path. Unset them to build unsigned.
+        run: |
+          if [ "$SIGN" != true ] || [ -z "$CSC_LINK" ]; then
+            echo "Building unsigned."
+            unset CSC_LINK CSC_KEY_PASSWORD
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+          if [ "$SIGN" != true ] || [ -z "$APPLE_ID" ]; then
+            unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          fi
+          npm run package
+
+      - name: Check the signature
+        if: github.event_name != 'pull_request'
+        working-directory: app/release/mac-arm64
+        run: |
+          codesign --verify --deep --strict --verbose=2 scratchpad.app
+          codesign --verify --strict --verbose=2 scratchpad.app/Contents/Resources/bin/scratchpadd
+          spctl --assess --type execute --verbose=4 scratchpad.app
+
+      # The end-to-end suite, run against the build that ships.
+      - name: Test the packaged app
+        working-directory: app
+        run: SCRATCHPAD_E2E_APP="$PWD/release/mac-arm64/scratchpad.app/Contents/MacOS/scratchpad" npx playwright test app
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: test-results-mac
+          path: app/test-results
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: scratchpad-mac
+          path: |
+            app/release/*.dmg
+            app/release/*.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: scratchpad-mac
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

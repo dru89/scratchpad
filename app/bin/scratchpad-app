@@ -3,4 +3,7 @@
 #
 #   scratchpad-app [--background] [--capture [--new | --draft=<id>]] [--open=<id>]
 here=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
+if [ "$(uname)" = Darwin ]; then
+  exec "$here/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron" "$here" "$@"
+fi
 exec "$here/node_modules/electron/dist/electron" "$here" "$@"

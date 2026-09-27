@@ -4,17 +4,14 @@
 //
 //   cargo build --workspace && npm run test:e2e:headless
 
-import { _electron as electron, type ElectronApplication, expect, type Page, test } from '@playwright/test';
+import { type ElectronApplication, expect, type Page, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { binDir, launch } from './launch';
 
-const repo = resolve(__dirname, '..', '..');
-// Wayland normally; X11 when there's no Wayland display, as under
-// `npm run test:e2e:headless`, which keeps the run off your screen.
-const platform = process.env.WAYLAND_DISPLAY ? 'wayland' : 'x11';
-const cli = join(repo, 'target', 'debug', 'scratchpad');
+const cli = join(binDir, 'scratchpad');
 const shots = process.env.SCRATCHPAD_SHOTS;
 
 let dir: string;
@@ -62,10 +59,10 @@ test.describe.serial('scratchpad app', () => {
       SCRATCHPAD_DATA_DIR: join(dir, 'data'),
       SCRATCHPAD_SOCKET: join(dir, 'daemon.sock'),
       SCRATCHPAD_APP_STATE_DIR: join(dir, 'app'),
-      SCRATCHPAD_DAEMON: join(repo, 'target', 'debug', 'scratchpadd'),
+      SCRATCHPAD_DAEMON: join(binDir, 'scratchpadd'),
       SCRATCHPAD_IDLE_MS: '1500',
     };
-    app = await electron.launch({ args: [`--ozone-platform=${platform}`, '.'], cwd: resolve(__dirname, '..'), env });
+    app = await launch(env);
   });
 
   test.afterAll(async () => {
@@ -123,7 +120,7 @@ test.describe.serial('scratchpad app', () => {
     await capture.keyboard.type('Quick thought from the hotkey');
     await expect.poll(() => list().map((d) => d.title)).toContain('Quick thought from the hotkey');
     await shot(capture, 'capture-window');
-    await capture.keyboard.press('Control+Enter');
+    await capture.keyboard.press('ControlOrMeta+Enter');
     await expect.poll(() => isVisible('capture')).toBe(false);
     expect(await editorText(capture)).not.toContain('Quick thought');
   });
@@ -133,7 +130,7 @@ test.describe.serial('scratchpad app', () => {
     const capture = await windowOf('capture');
     await capture.locator('.cm-content').click();
     await capture.keyboard.type('Pinned note');
-    await capture.keyboard.press('Control+Shift+P');
+    await capture.keyboard.press('ControlOrMeta+Shift+P');
     await capture.keyboard.press('Escape');
     await expect.poll(() => isVisible('capture')).toBe(false);
     await capture.waitForTimeout(2000);
@@ -141,7 +138,7 @@ test.describe.serial('scratchpad app', () => {
     await expect.poll(() => isVisible('capture')).toBe(true);
     await expect.poll(() => editorText(capture)).toContain('Pinned note');
 
-    await capture.keyboard.press('Control+Shift+P'); // unpin
+    await capture.keyboard.press('ControlOrMeta+Shift+P'); // unpin
     await capture.keyboard.press('Escape');
     await capture.waitForTimeout(2000);
     run('capture');
@@ -153,12 +150,12 @@ test.describe.serial('scratchpad app', () => {
   test('a draft emptied before moving on is discarded', async () => {
     const main = await windowOf('main');
     await main.bringToFront();
-    await main.keyboard.press('Control+n');
+    await main.keyboard.press('ControlOrMeta+n');
     await main.keyboard.type('temporary');
     await expect.poll(() => list().map((d) => d.title)).toContain('temporary');
-    await main.keyboard.press('Control+a');
+    await main.keyboard.press('ControlOrMeta+a');
     await main.keyboard.press('Backspace');
-    await main.keyboard.press('Control+n');
+    await main.keyboard.press('ControlOrMeta+n');
     await expect.poll(() => list().map((d) => d.title)).not.toContain('temporary');
     expect(list().some((d) => d.title === 'New draft')).toBe(false);
   });
@@ -166,20 +163,20 @@ test.describe.serial('scratchpad app', () => {
   test('archive moves the open draft out of the Inbox', async () => {
     const main = await windowOf('main');
     await main.locator('.item-title', { hasText: 'Made by the CLI' }).click();
-    await main.keyboard.press('Control+Shift+A');
+    await main.keyboard.press('ControlOrMeta+Shift+A');
     await expect.poll(() => list('--archived').map((d) => d.title)).toContain('Made by the CLI');
     await expect(main.locator('.item-title', { hasText: 'Made by the CLI' })).toHaveCount(0);
-    await main.keyboard.press('Control+2');
+    await main.keyboard.press('ControlOrMeta+2');
     await expect(main.locator('.item-title', { hasText: 'Made by the CLI' })).toBeVisible();
-    await main.keyboard.press('Control+1');
+    await main.keyboard.press('ControlOrMeta+1');
   });
 
   test('copy as rich text puts HTML on the clipboard', async () => {
     const main = await windowOf('main');
-    await main.keyboard.press('Control+n');
+    await main.keyboard.press('ControlOrMeta+n');
     await main.keyboard.type('| a | b |\n| - | - |\n| 1 | 2 |\n\n**bold**');
     await expect.poll(() => list().some((d) => d.title === 'a | b')).toBe(true);
-    await main.keyboard.press('Control+Shift+C');
+    await main.keyboard.press('ControlOrMeta+Shift+C');
     await expect(main.locator('#toast')).toHaveText('Copied as rich text');
     const html = await app.evaluate(async ({ clipboard }) => {
       const [item] = await clipboard.read();
@@ -192,11 +189,11 @@ test.describe.serial('scratchpad app', () => {
   test('a draft opened in its own window stays in sync', async () => {
     const main = await windowOf('main');
     await main.locator('.item-title', { hasText: 'Hello from the app' }).click();
-    await main.keyboard.press('Control+Shift+O');
+    await main.keyboard.press('ControlOrMeta+Shift+O');
     const own = await windowOf('draft');
     await expect.poll(() => editorText(own)).toContain('A line from an agent.');
     await own.locator('.cm-content').click();
-    await own.keyboard.press('Control+End');
+    await own.keyboard.press('ControlOrMeta+End');
     await own.keyboard.type('\nWritten in the second window.');
     await expect.poll(() => editorText(main)).toContain('Written in the second window.');
     await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.getTitle()))).toContain(
@@ -207,7 +204,7 @@ test.describe.serial('scratchpad app', () => {
   test('quick switcher finds and opens drafts', async () => {
     const main = await windowOf('main');
     await main.bringToFront();
-    await main.keyboard.press('Control+k');
+    await main.keyboard.press('ControlOrMeta+k');
     await main.keyboard.type('hotkey');
     await expect(main.locator('.switcher-item .item-title').first()).toHaveText('Quick thought from the hotkey');
     await shot(main, 'switcher');
@@ -217,11 +214,11 @@ test.describe.serial('scratchpad app', () => {
 
   test('find marks matches inside a rendered table', async () => {
     const main = await windowOf('main');
-    await main.keyboard.press('Control+n');
+    await main.keyboard.press('ControlOrMeta+n');
     await main.keyboard.type('Status\n\n| part | note |\n| - | - |\n| server | needs **more** work |\n\nsee more below');
     const table = main.locator('.cm-table-wrap');
     await expect(table).toBeVisible();
-    await main.keyboard.press('Control+f');
+    await main.keyboard.press('ControlOrMeta+f');
     await main.keyboard.type('more');
     await expect(main.locator('.find-count')).toHaveText('2 matches');
     await expect(table.locator('.cm-searchMatch')).toHaveText(['more']);

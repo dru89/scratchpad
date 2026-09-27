@@ -11,6 +11,7 @@
     "build:main": "tsc -p electron",
     "build:renderer": "vite build",
     "build": "npm run build:main && npm run build:renderer",
+    "package": "npm run build && electron-builder --publish never",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p electron",
     "start": "npm run build && electron --ozone-platform=wayland .",
     "test": "vitest run",
@@ -18,7 +19,7 @@
     "test:e2e:headless": "npm run build && env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 xvfb-run -a -s '-screen 0 1920x1200x24' playwright test",
     "screenshots": "npm run build && SCRATCHPAD_SCREENSHOTS=../docs/design-handoff/screenshots playwright test screenshots"
   },
-  "dependencies": {
+  "devDependencies": {
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/language": "^6.12.4",
@@ -26,14 +27,14 @@
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.13",
     "@lezer/highlight": "^1.2.4",
-    "loro-crdt": "^1.16.3"
-  },
-  "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.3",
     "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "loro-crdt": "^1.16.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
     "vitest": "^5.0.2"
-  }
+  },
+  "author": "Drew Hays <drew@hays.fm>"
 }

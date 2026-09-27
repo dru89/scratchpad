@@ -53,8 +53,23 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-const isMac = typeof navigator !== 'undefined' && navigator.platform.startsWith('Mac');
+export const isMac = typeof navigator !== 'undefined' && navigator.platform.startsWith('Mac');
 const KEY_GLYPHS: Record<string, string> = { Mod: isMac ? '⌘' : 'Ctrl', Enter: '↵', Backspace: '⌫', Up: '↑', Down: '↓' };
+
+const MAC_MODIFIERS = ['Ctrl', 'Alt', 'Shift', 'Mod'];
+const MAC_GLYPHS: Record<string, string> = { Ctrl: '⌃', Alt: '⌥', Shift: '⇧', Mod: '⌘', Enter: '↩', Backspace: '⌫' };
+
+/**
+ * A shortcut as text, for tooltips: shortcut('Mod+Shift+P') is "Ctrl+Shift+P",
+ * or "⇧⌘P" on macOS, with the modifiers in the order macOS menus use.
+ */
+export function shortcut(keys: string, mac = isMac): string {
+  const parts = keys.split('+');
+  if (!mac) return parts.map((k) => (k === 'Mod' ? 'Ctrl' : k)).join('+');
+  const key = parts.pop()!;
+  parts.sort((a, b) => MAC_MODIFIERS.indexOf(a) - MAC_MODIFIERS.indexOf(b));
+  return [...parts, key].map((k) => MAC_GLYPHS[k] ?? k).join('');
+}
 
 /** Keycaps, one per key: kbd('Mod+Shift+A'). Mod is Ctrl, or ⌘ on macOS. */
 export function kbd(keys: string): string {

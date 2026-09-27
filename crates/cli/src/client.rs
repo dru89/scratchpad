@@ -92,7 +92,9 @@ fn daemon_binary() -> PathBuf {
     if let Some(path) = std::env::var_os("SCRATCHPAD_DAEMON") {
         return path.into();
     }
-    if let Ok(exe) = std::env::current_exe() {
+    // Resolved, so a symlink to the CLI (like the one the macOS app installs
+    // in ~/.local/bin) still finds the daemon beside the real binary.
+    if let Ok(exe) = std::env::current_exe().and_then(std::fs::canonicalize) {
         let sibling = exe.with_file_name("scratchpadd");
         if sibling.exists() {
             return sibling;

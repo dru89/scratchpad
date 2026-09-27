@@ -1,8 +1,22 @@
 // scratchpad's Electron main process: window management, the `ui` client
 // connection to the daemon, and the few things a sandboxed renderer can't do
-// (clipboard with HTML, native menus, KWin).
+// (clipboard with HTML, native menus, KWin, the macOS capture hotkey).
 
-import { app, BrowserWindow, ClipboardItem, clipboard, ipcMain, Menu, net, protocol } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  ClipboardItem,
+  clipboard,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  type MenuItemConstructorOptions,
+  net,
+  protocol,
+} from 'electron';
+import { mkdirSync, rmSync, symlinkSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AppClient } from './daemon';
@@ -10,6 +24,13 @@ import { StateStore, Windows } from './windows';
 
 const IDLE_MS = Number(process.env.SCRATCHPAD_IDLE_MS) || 15 * 60 * 1000;
 const RENDERER = join(__dirname, '..', 'dist-renderer');
+const isMac = process.platform === 'darwin';
+/**
+ * The capture hotkey on macOS, where an app can register one itself. On
+ * Linux it's a desktop shortcut that runs `scratchpad capture`
+ * (app/scripts/install-linux.sh), because Wayland doesn't let apps grab keys.
+ */
+const CAPTURE_HOTKEY = 'Command+Shift+2';
 
 if (process.env.SCRATCHPAD_APP_STATE_DIR) app.setPath('userData', process.env.SCRATCHPAD_APP_STATE_DIR);
 
@@ -30,6 +51,68 @@ function summon(windows: Windows, argv: string[]) {
   }
 }
 
+/** Links the bundled CLI into ~/.local/bin, from the app menu on macOS. */
+async function installCli() {
+  const target = join(process.resourcesPath, 'bin', 'scratchpad');
+  const dir = join(homedir(), '.local', 'bin');
+  const link = join(dir, 'scratchpad');
+  try {
+    mkdirSync(dir, { recursive: true });
+    rmSync(link, { force: true });
+    symlinkSync(target, link);
+    await dialog.showMessageBox({
+      message: 'Installed the scratchpad command',
+      detail: `${link} now runs the command-line tool in this app. If your shell can't find it, add ~/.local/bin to your PATH.`,
+    });
+  } catch (e) {
+    await dialog.showMessageBox({ type: 'warning', message: "Couldn't install the scratchpad command", detail: String(e) });
+  }
+}
+
+function buildMenu(): Menu {
+  // No undo/redo roles in Edit: native undo would bypass the editor's own,
+  // which only reverts this window's edits.
+  const edit: MenuItemConstructorOptions = {
+    label: 'Edit',
+    submenu: [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }],
+  };
+  const view: MenuItemConstructorOptions = {
+    label: 'View',
+    submenu: [{ role: 'toggleDevTools' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }],
+  };
+  if (!isMac) {
+    return Menu.buildFromTemplate([{ label: 'File', submenu: [{ role: 'close' }, { role: 'quit' }] }, edit, view]);
+  }
+  return Menu.buildFromTemplate([
+    {
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        {
+          label: 'Open at Login',
+          type: 'checkbox',
+          checked: app.getLoginItemSettings().openAtLogin,
+          click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }),
+        },
+        ...(app.isPackaged ? [{ label: 'Install Command Line Tool…', click: () => void installCli() }] : []),
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    { label: 'File', submenu: [{ role: 'close' }] },
+    edit,
+    view,
+    { role: 'windowMenu' },
+  ]);
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -47,6 +130,11 @@ if (!app.requestSingleInstanceLock()) {
     if (windows) windows.quitting = true;
   });
 
+  // macOS: clicking the Dock icon with no window showing brings back the main one.
+  app.on('activate', (_e, hasVisibleWindows) => {
+    if (windows && !hasVisibleWindows) windows.showMain();
+  });
+
   // The capture window stays alive (hidden), so this rarely fires; when it
   // does, keep running for the next hotkey press.
   app.on('window-all-closed', () => {});
@@ -61,24 +149,28 @@ if (!app.requestSingleInstanceLock()) {
     state = new StateStore();
     windows = new Windows(state);
     windows.createCapture();
-    summon(windows, process.argv);
+    // Opened at login on macOS counts as --background: ready for the hotkey, nothing shown.
+    const atLogin = isMac && app.getLoginItemSettings().wasOpenedAtLogin;
+    summon(windows, atLogin ? [...process.argv, '--background'] : process.argv);
+
+    if (isMac) {
+      if (!globalShortcut.register(CAPTURE_HOTKEY, () => windows.showCapture({ mode: 'summon' }))) {
+        console.error(`scratchpad: couldn't register ${CAPTURE_HOTKEY}; another app may have it`);
+      }
+      // The hotkey only works while the app runs, so it starts at login
+      // unless you've turned that off. Not for test runs, which set their
+      // own state directory.
+      if (app.isPackaged && !process.env.SCRATCHPAD_APP_STATE_DIR && !state.get('app').loginItemSet) {
+        app.setLoginItemSettings({ openAtLogin: true });
+        state.update('app', { loginItemSet: true });
+      }
+    }
 
     daemon = new AppClient();
     daemon.on('ui.capture', (p) => windows.showCapture(p ?? {}));
     daemon.on('ui.open', (p) => p?.id && windows.openDraft(p.id));
 
-    Menu.setApplicationMenu(
-      Menu.buildFromTemplate([
-        { label: 'File', submenu: [{ role: 'close' }, { role: 'quit' }] },
-        // No undo/redo roles: native undo would bypass the editor's own,
-        // which only reverts this window's edits.
-        {
-          label: 'Edit',
-          submenu: [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }],
-        },
-        { label: 'View', submenu: [{ role: 'toggleDevTools' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }] },
-      ]),
-    );
+    Menu.setApplicationMenu(buildMenu());
 
     const managed = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => {
       const m = windows.managed(e.sender.id);
@@ -94,7 +186,7 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('win:savePrefs', (e, patch) => state?.update(managed(e).key, patch));
     ipcMain.on('win:setTitle', (e, title: string) => managed(e).win.setTitle(title));
     ipcMain.handle('win:setFloat', (e, on: boolean) => windows.setFloat(managed(e), on));
-    ipcMain.on('win:hide', (e) => managed(e).win.hide());
+    ipcMain.on('win:hide', (e) => windows.hide(managed(e)));
     ipcMain.on('win:close', (e) => {
       const m = managed(e);
       if (m.kind === 'draft') windows.closeDraftWindow(m);
@@ -125,5 +217,8 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   // Write out window state still waiting on its debounce.
-  app.on('will-quit', () => state?.flush());
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+    state?.flush();
+  });
 }

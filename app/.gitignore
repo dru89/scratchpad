@@ -2,3 +2,4 @@ dist-electron/
 dist-renderer/
 test-results/
 playwright-report/
+release/
