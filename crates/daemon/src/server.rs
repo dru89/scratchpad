@@ -22,9 +22,24 @@ enum Msg {
     Shutdown,
 }
 
+/// SIGTERM and SIGINT. Registered before the socket exists, so a signal
+/// sent as soon as a client could connect still shuts down cleanly instead
+/// of killing the process.
+pub struct Signals {
+    term: tokio::signal::unix::Signal,
+    int: tokio::signal::unix::Signal,
+}
+
+impl Signals {
+    pub fn register() -> std::io::Result<Signals> {
+        use tokio::signal::unix::{SignalKind, signal};
+        Ok(Signals { term: signal(SignalKind::terminate())?, int: signal(SignalKind::interrupt())? })
+    }
+}
+
 /// Runs until a client calls `daemon.shutdown` or the process gets
 /// SIGINT/SIGTERM.
-pub async fn run(listener: UnixListener, mut daemon: Daemon) -> anyhow::Result<()> {
+pub async fn run(listener: UnixListener, mut daemon: Daemon, mut signals: Signals) -> anyhow::Result<()> {
     let (tx, mut rx) = mpsc::unbounded_channel::<Msg>();
 
     let accept_tx = tx.clone();
@@ -76,11 +91,9 @@ pub async fn run(listener: UnixListener, mut daemon: Daemon) -> anyhow::Result<(
 
     let signal_tx = tx.clone();
     tokio::spawn(async move {
-        use tokio::signal::unix::{SignalKind, signal};
-        let (mut term, mut int) = (signal(SignalKind::terminate()).unwrap(), signal(SignalKind::interrupt()).unwrap());
         tokio::select! {
-            _ = term.recv() => {}
-            _ = int.recv() => {}
+            _ = signals.term.recv() => {}
+            _ = signals.int.recv() => {}
         }
         let _ = signal_tx.send(Msg::Shutdown);
     });

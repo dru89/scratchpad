@@ -28,6 +28,8 @@ async fn main() -> Result<()> {
         }
     };
 
+    let signals = server::Signals::register()?;
+
     let socket_dir = paths.socket.parent().context("socket path has no parent")?;
     std::fs::create_dir_all(socket_dir)?;
     std::fs::set_permissions(socket_dir, std::fs::Permissions::from_mode(0o700))?;
@@ -44,7 +46,7 @@ async fn main() -> Result<()> {
         paths.socket.display()
     );
 
-    let result = server::run(listener, daemon).await;
+    let result = server::run(listener, daemon, signals).await;
     let _ = std::fs::remove_file(&paths.socket);
     eprintln!("scratchpadd: stopped");
     result
