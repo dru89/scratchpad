@@ -2,9 +2,19 @@
 
 Condensed from the initial scoping. Sources are linked where a claim is load-bearing.
 
+## Requirements
+
+- A flat list of drafts with three states: Inbox, Archived, Trash. Trash purges itself after N days. No folders, no file names, no filesystem visible to the user.
+- Markdown source with live-preview rendering, including tables.
+- Copy as rich text (`text/html` and `text/plain` on the clipboard).
+- Multiple windows, any window can float on top, and a global hotkey opens a quick-capture window.
+- Agents can read and edit drafts, through a CLI and an MCP server against the local replica.
+- Linux (KDE Plasma on Wayland first), macOS and iOS.
+- Fast, end-to-end encrypted sync to a self-hostable server.
+
 ## Why build this at all
 
-No existing app covers the requirements in the [README](../README.md). The closest:
+No existing app covers those requirements. The closest:
 
 - **Obsidian + Self-hosted LiveSync** covers the most on paper (plain files, live-preview tables, pop-out windows, E2EE sync to your own CouchDB). But it's a files-and-folders app, so every note is a filing decision, which is the "too permanent" feeling. Large tables lag in Live Preview, and iOS only syncs while the app is open.
 - **Notesnook** feels the most like Drafts (flat list, first-line titles, archive, trash that auto-clears, fast E2EE sync). But it stores rich text rather than markdown, has no separate windows, hotkey or agent API, and its self-hosted server is an Oct 2025 beta marked not production-ready.

@@ -26,7 +26,7 @@ Newest first. Each entry says what was decided, why, and what would make us revi
 
 **Why:**
 - Agents and the CLI work with the app closed.
-- The same binary runs headless on ds9 as the replica remote agents can reach.
+- The same binary can run headless on a server, as a replica that remote agents can reach.
 - There's one API surface, and no napi-rs module to rebuild for every Electron release.
 - There's one writer to the store.
 

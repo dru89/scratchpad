@@ -1,96 +1,120 @@
 # scratchpad
 
-Working name for a Drafts-style scratchpad: a place where text starts, gets shaped, and then gets copied somewhere else. The daemon, CLI, MCP server and Linux desktop app work today; sync and the other platforms don't exist yet.
+A place where text starts. Write the first version of something, like a reply, meeting notes or a paragraph for a doc, shape it, then copy it wherever it's going. scratchpad keeps every draft in one list and asks you to make one decision about each: whether you're done with it.
 
-## What it needs to do
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/main-dark.png">
+  <img alt="The main window: a list of drafts on the left, and a draft with headings, a table and lists on the right" src="docs/images/main-light.png">
+</picture>
 
-- Flat list of drafts with three states: Inbox, Archived, Trash. Trash purges itself after N days. No folders, no file names, no filesystem visible to the user.
-- Markdown source with live-preview rendering, including tables.
-- Copy as rich text (`text/html` + `text/plain` on the clipboard).
-- Multi-window, any window can float on top, and a global hotkey opens a quick-capture window.
-- Agents can read and edit drafts (CLI + MCP against the local replica).
-- Linux (KDE Plasma on Wayland first), macOS, iOS.
-- Fast, end-to-end encrypted sync to a self-hostable server.
+It's inspired by [Drafts](https://getdrafts.com), and it runs on macOS and Linux.
 
-## Stack
+## What it does
 
-- Editor: CodeMirror 6 live preview, with the markdown string as the only source of truth.
-- Desktop: **Electron** (decided 2026-09-23 after [`spikes/shell-test`](spikes/shell-test/)). The long-term macOS shell is still open.
-- Core: Rust daemon (SQLite, Loro CRDT, crypto, sync) serving the app, a CLI and an MCP server over one local socket. In-process on iOS.
-- iOS: SwiftUI shell hosting the same editor in a WKWebView, native text view for quick capture.
-- Sync: small Rust server storing opaque encrypted records (Loro `%ELO` framing).
+**No filing.** There are no folders, file names or tags. Every draft lives in the Inbox, newest first, and its title is its first line. When you're done with a draft, archive it. The Trash empties itself after 30 days.
 
-See [`docs/design.md`](docs/design.md) for the v1 design, [`docs/visual-design.md`](docs/visual-design.md) for how it looks and why, [`docs/decisions.md`](docs/decisions.md) for the reasoning, and [`docs/research.md`](docs/research.md) for the background.
+**Markdown, shown as it will look.** Type markdown and it renders in place: headings, bold and italics, links, lists, task lists, quotes, code and tables. The syntax comes back only where your cursor is, so you can still edit it, and the text underneath is always plain markdown, ready to paste anywhere.
 
-## Next
+<img alt="The same draft with the cursor inside the table, which shows as markdown so it can be edited" src="docs/images/table-editing.png">
 
-1. ~~**Design note.**~~ Done: [`docs/design.md`](docs/design.md).
-2. ~~**Editor binding spike.**~~ Done: [`spikes/editor-binding`](spikes/editor-binding/). Each window keeps a Loro copy of the draft bound to CodeMirror; agent edits merge live and undo stays local.
-3. ~~**Daemon, CLI and MCP.**~~ Done: [`crates/`](crates/). Agents can use drafts before there's a UI.
-4. ~~**Electron app on Linux.**~~ Built: [`app/`](app/). Next is using it in place of Drafts for a while and fixing what that turns up.
-5. **Sync.** A Rust server on ds9, E2EE via Loro `%ELO`, and device enrollment. Plus the Mac build of the Electron app.
-6. **iOS app.**
+**Capture from anywhere.** A global hotkey brings up a small floating window for getting a thought down. Esc hides it again, and ⌘↩ files the draft and clears the window for next time. If you come back after 15 minutes away, it starts on a fresh draft, unless you've pinned it to keep one going through a long meeting.
 
-## Using it
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/capture-dark.png">
+  <img alt="The capture window, pinned and floating on top, with Done at the bottom right" src="docs/images/capture-light.png" width="560">
+</picture>
 
-Build and install the daemon and CLI (Rust 1.89 or newer):
+**Copy as rich text.** One shortcut puts the draft on the clipboard as formatted text, with the markdown alongside, so pasting into Slack, email or a document keeps the formatting.
+
+**Find anything.** ⌘K opens a quick switcher that searches the title and text of every draft. The sidebar filter narrows the list you're looking at, and ⌘F finds within a draft.
+
+<img alt="The quick switcher, searching for 'offsite', with matches highlighted in each result" src="docs/images/switcher.png">
+
+**Windows your way.** Open any draft in its own window, and float any window above the others.
+
+**Made for agents too.** A command-line tool and an MCP server let scripts and AI agents search, read, create and edit drafts. Everything that edits a draft, whether that's you, an agent or another window, makes versioned edits that merge. An agent can revise a draft while you're typing in it without losing your words, and undo only undoes your own typing.
+
+**Local and fast.** Your drafts stay in a database on your computer. Typing never waits on anything: each window edits its own copy of the draft and syncs with a small background service.
+
+## Install
+
+### macOS
+
+For Macs with Apple silicon.
+
+1. Download the `.dmg` from the [latest release](https://github.com/dru89/scratchpad/releases/latest), open it, and drag scratchpad to Applications.
+2. Open scratchpad. It adds itself to your login items so the capture hotkey is always ready. You can turn that off with **scratchpad > Open at Login**.
+3. Press ⌘⇧2 in any app to capture a thought.
+
+To use scratchpad from the terminal, choose **scratchpad > Install Command Line Tool**, which links `scratchpad` into `~/.local/bin`.
+
+### Linux
+
+For now, build it from source. You need Rust 1.89 or newer and Node.js 24. It's developed on KDE Plasma on Wayland; other desktops work, but you'll set up the capture hotkey yourself.
 
 ```bash
-cargo install --locked --root ~/.local --path crates/daemon && cargo install --locked --root ~/.local --path crates/cli
+git clone https://github.com/dru89/scratchpad && cd scratchpad
+cargo install --locked --root ~/.local --path crates/daemon
+cargo install --locked --root ~/.local --path crates/cli
+cd app && npm install && npm run build
+scripts/install-linux.sh
 ```
 
-`scratchpad` starts the daemon (`scratchpadd`) the first time it needs it.
+The install script adds scratchpad to your application launcher and starts it in the background when you log in (pass `--no-autostart` to skip that). On KDE it also sets Meta+Shift+2 to open the capture window; confirm that once in System Settings > Keyboard > Shortcuts. On other desktops, bind a shortcut to `scratchpad capture`. `scripts/install-linux.sh --uninstall` removes it all.
+
+## Keyboard shortcuts
+
+| action | macOS | Linux |
+| --- | --- | --- |
+| Capture from anywhere | ⌘⇧2 | Meta+Shift+2 |
+| New draft | ⌘N | Ctrl+N |
+| Done: file it and start fresh | ⌘↩ | Ctrl+Enter |
+| Quick switcher | ⌘K | Ctrl+K |
+| Pin, so the window keeps its draft | ⇧⌘P | Ctrl+Shift+P |
+| Float on top | ⇧⌘F | Ctrl+Shift+F |
+| Copy as rich text | ⇧⌘C | Ctrl+Shift+C |
+| Archive, or move back to the Inbox | ⇧⌘A | Ctrl+Shift+A |
+| Trash, or restore | ⇧⌘⌫ | Ctrl+Shift+Backspace |
+| Open in its own window | ⇧⌘O | Ctrl+Shift+O |
+| Show or hide the sidebar | ⌘\ | Ctrl+\ |
+| Inbox, Archive, Trash | ⌘1, ⌘2, ⌘3 | Ctrl+1, Ctrl+2, Ctrl+3 |
+| Filter the sidebar | ⇧⌘L | Ctrl+Shift+L |
+| Find, and find and replace | ⌘F, ⌥⌘F | Ctrl+F, Ctrl+H |
+| Hide the capture window | Esc | Esc |
+
+Closing the main window keeps scratchpad running for the hotkey. Quit from the menu, or with ⌘Q (Ctrl+Q on Linux).
+
+## Command line and agents
 
 ```bash
 scratchpad new "# Idea" "for later"      # prints the new draft's id
 echo "more thoughts" | scratchpad append 01M3F9ZX7F
-scratchpad list                          # Inbox, newest first; --archived, --trash, --all
-scratchpad search sync "rich copy"       # every word must match; phrases in quotes
-scratchpad edit 01M3F9ZX7F                     # $EDITOR; typing done elsewhere meanwhile is kept
-scratchpad archive 01M3F9ZX7F                  # also trash, restore
+scratchpad list                          # the Inbox, newest first; --archived, --trash, --all
+scratchpad search sync "rich copy"       # every word must match; quote phrases
+scratchpad show 01M3F9ZX7F               # the draft as markdown
+scratchpad edit 01M3F9ZX7F               # in $EDITOR; typing done elsewhere meanwhile is kept
+scratchpad archive 01M3F9ZX7F            # also trash and restore
+scratchpad capture                       # open the capture window, from Raycast, a script or anything else
 ```
 
-Any unique prefix of an id works. Add `--json` to any command for machine-readable output.
+Any unique prefix of a draft's id works, and `--json` gives machine-readable output.
 
-To give an agent access, register the MCP server. For Claude Code, in every project:
+For AI agents, `scratchpad mcp` is an MCP server. To add it to Claude Code for every project:
 
 ```bash
 claude mcp add --scope user scratchpad -- ~/.local/bin/scratchpad mcp
 ```
 
-(That assumes `cargo install --root ~/.local`; adjust the path to wherever `scratchpad` lives.)
+Agents can list, search, read, create, update and append to drafts, and archive, trash or restore them. None of the tools delete anything permanently.
 
-Data lives in `~/.local/share/scratchpad/` on Linux and `~/Library/Application Support/dev.unremarkable.scratchpad/` on macOS. The daemon logs to `daemon.log` there.
+## Your data
 
-### The desktop app
+Drafts live in `~/Library/Application Support/dev.unremarkable.scratchpad/` on macOS and `~/.local/share/scratchpad/` on Linux. There's no sync yet, and nothing leaves your computer. `scratchpad list --all` and `scratchpad show` get any draft back out as plain markdown.
 
-```bash
-cd app && npm install && npm run build
-scripts/install-linux.sh     # launcher, desktop entry, autostart, and the capture shortcut
-```
+## Status
 
-The install script links `~/.local/bin/scratchpad-app`, adds scratchpad to the application launcher, starts it in the background at login (`--no-autostart` to skip), and registers a "scratchpad capture" command with Meta+Shift+2 as its default. Confirm that binding once in System Settings > Keyboard > Shortcuts. `--uninstall` removes it all. Without installing, `npm start` in `app/` runs it directly.
+scratchpad is young, and built by one person for daily use. Sync between your devices, end-to-end encrypted through a server you can host yourself, comes next, followed by an iPhone app. The [roadmap](docs/roadmap.md) has more. The name is a working one.
 
-The main window has the sidebar and an editor; the capture window floats and hides with Esc; Ctrl+Enter files a capture and clears it; Ctrl+K finds any draft; Ctrl+Shift+C copies as rich text. The full list is in [`docs/design.md`](docs/design.md#capture-window-actions).
+## Building and contributing
 
-## Developing
-
-```bash
-cargo test --workspace         # unit tests plus end-to-end tests of the real binaries
-cargo build --release && scripts/load-test.py   # timings with 2,000 drafts and a 100k-word draft
-cd app && npm test             # renderer unit tests
-cd app && npm run test:e2e     # the real app against a throwaway daemon (needs a display; build the workspace first)
-cd app && npm run test:e2e:headless   # the same on a virtual X display (xvfb-run), so it doesn't take your focus
-```
-
-`SCRATCHPAD_DATA_DIR` and `SCRATCHPAD_SOCKET` point a daemon and its clients somewhere other than the defaults, which is how the tests stay isolated.
-
-## Layout
-
-- `crates/core/`: the draft model, SQLite store, titles, search, rendering and protocol types. It's a library so the iOS app can embed it.
-- `crates/daemon/`: `scratchpadd`.
-- `crates/cli/`: `scratchpad`, including `scratchpad mcp`.
-- `app/`: the Electron desktop app. `electron/` is the main process, `src/` the windows.
-- `docs/`: design, decisions and research notes.
-- `spikes/`: throwaway experiments that answer one question each.
-- `scripts/`: the load test.
+[`docs/development.md`](docs/development.md) covers building from source, the tests, packaging, and how the pieces fit together. [`docs/design.md`](docs/design.md) explains how it works, and [`docs/visual-design.md`](docs/visual-design.md) how it looks and why.

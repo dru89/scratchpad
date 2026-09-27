@@ -178,7 +178,7 @@ Ctrl on Linux, Cmd on macOS.
 | Inbox / Archive / Trash | Ctrl+1 / Ctrl+2 / Ctrl+3 |
 | Filter the sidebar | Ctrl+Shift+L |
 | Find in the draft | Ctrl+F |
-| Find and replace | Ctrl+H |
+| Find and replace | Ctrl+H (Cmd+Option+F on macOS, where Cmd+H hides the app) |
 
 Archiving or trashing from the main or capture window moves that window on to a new draft; a draft's own window stays on it and shows a badge.
 
@@ -187,7 +187,7 @@ Closing the main or capture window hides it, so the app keeps running for the ho
 **Hotkey plumbing.**
 - On Linux, a KDE custom command runs `scratchpad capture`, which reaches the app through the daemon. KDE's portal-based global shortcuts are unreliable on this Plasma version; a custom command doesn't use the portal. The app then focuses the window through KWin, since Wayland won't let it take focus itself.
 - If the app isn't running, `scratchpad capture` (and `scratchpad open`) start it with `scratchpad-app --capture` (or `--open=<id>`).
-- On macOS, the app registers Cmd+Shift+2 itself with Electron's `globalShortcut` and starts at login.
+- On macOS, the app registers Cmd+Shift+2 itself with Electron's `globalShortcut` and starts at login (the app menu's Open at Login turns that off). The capture window can come up over a full-screen app, and hiding it with nothing else open hides the app, so focus goes back to where you were typing.
 - `scratchpad capture` works everywhere, so Raycast, Keyboard Maestro or an agent can summon the window too.
 
 **Float.** The capture window floats by default, and any window can toggle it. On KDE that runs the KWin script from the shell test; on macOS it's `setAlwaysOnTop`.
