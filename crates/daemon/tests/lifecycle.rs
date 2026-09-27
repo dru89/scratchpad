@@ -132,7 +132,8 @@ async fn exits_when_an_update_replaces_its_binary() {
     assert_eq!(call(&mut stream, "daemon.status", json!({})).await["result"]["pid"], child.id());
 
     // Installers write the new binary beside the old one and rename it over.
-    tokio::time::sleep(Duration::from_millis(1100)).await; // a new modification time on coarse filesystems
+    // On macOS the copy keeps the original's size and modification time, so
+    // only the inode tells them apart.
     let fresh = binary.with_file_name("scratchpadd.new");
     std::fs::copy(env!("CARGO_BIN_EXE_scratchpadd"), &fresh).unwrap();
     std::fs::rename(&fresh, &binary).unwrap();

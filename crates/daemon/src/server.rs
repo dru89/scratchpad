@@ -107,16 +107,20 @@ pub async fn run(listener: UnixListener, mut daemon: Daemon) -> anyhow::Result<(
     Ok(())
 }
 
-/// Enough of a file's metadata to tell that it was replaced.
+/// Enough of a file's metadata to tell that it was replaced. Installers
+/// rename a new file over the old one, which changes the inode even when
+/// the size and modification time come out the same.
 #[derive(PartialEq)]
 struct Stamp {
+    inode: u64,
     len: u64,
     modified: SystemTime,
 }
 
 fn stamp(path: &Path) -> Option<Stamp> {
+    use std::os::unix::fs::MetadataExt;
     let meta = std::fs::metadata(path).ok()?;
-    Some(Stamp { len: meta.len(), modified: meta.modified().ok()? })
+    Some(Stamp { inode: meta.ino(), len: meta.len(), modified: meta.modified().ok()? })
 }
 
 /// This process's binary, and how it looked when the daemon started.
