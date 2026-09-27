@@ -15,12 +15,12 @@ import {
   setSearchQuery,
 } from '@codemirror/search';
 import { type EditorView, type Panel, runScopeHandlers, type ViewUpdate } from '@codemirror/view';
-import { escapeHtml, isMac, shortcut } from '../format';
+import { escapeHtml, isMac } from '../format';
 import { icon } from '../icons';
 
 /** Opens the replace row: Ctrl+H, or ⌘⌥F on macOS, where ⌘H hides the app. */
 export const REPLACE_KEY = { key: 'Mod-h', mac: 'Mod-Alt-f' };
-const REPLACE_KEYS = shortcut(isMac ? 'Mod+Alt+F' : 'Mod+H');
+const REPLACE_KEYS = isMac ? 'Mod+Alt+F' : 'Mod+H';
 
 /** Stop counting here, so a long draft with a common query stays cheap. */
 const MAX_COUNT = 999;
@@ -53,10 +53,10 @@ class FindPanel implements Panel {
 
   constructor(private view: EditorView) {
     this.query = getSearchQuery(view.state);
-    const tool = (name: string, iconName: Parameters<typeof icon>[0], label: string) =>
-      `<button class="tool" name="${name}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label.replace(/ \(.*\)$/, ''))}">${icon(iconName)}</button>`;
+    const tool = (name: string, iconName: Parameters<typeof icon>[0], label: string, keys: string) =>
+      `<button class="tool" name="${name}" data-tip="${escapeHtml(label)}" data-keys="${keys}" aria-label="${escapeHtml(label)}">${icon(iconName)}</button>`;
     const option = (name: string, text: string, label: string) =>
-      `<button class="find-opt" name="${name}" title="${label}" aria-label="${label}" aria-pressed="false">${text}</button>`;
+      `<button class="find-opt" name="${name}" data-tip="${label}" aria-label="${label}" aria-pressed="false">${text}</button>`;
 
     this.dom = document.createElement('div');
     this.dom.className = 'find';
@@ -72,11 +72,11 @@ class FindPanel implements Panel {
         ${option('re', '.*', 'Regular expression')}
         ${option('word', '<u>ab</u>', 'Whole word')}
         <span class="find-sep"></span>
-        ${tool('prev', 'up', 'Previous match (Shift+Enter)')}
-        ${tool('next', 'down', 'Next match (Enter)')}
+        ${tool('prev', 'up', 'Previous match', 'Shift+Enter')}
+        ${tool('next', 'down', 'Next match', 'Enter')}
         <span class="find-spacer"></span>
-        ${tool('toggle-replace', 'replace', `Replace (${REPLACE_KEYS})`)}
-        ${tool('close', 'close', 'Close (Esc)')}
+        ${tool('toggle-replace', 'replace', 'Replace', REPLACE_KEYS)}
+        ${tool('close', 'close', 'Close', 'Esc')}
       </div>
       <div class="find-row" hidden>
         <label class="find-field">

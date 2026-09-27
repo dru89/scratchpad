@@ -11,6 +11,7 @@ import { InfoPanel } from './info';
 import { Rpc } from './rpc';
 import { Sidebar } from './sidebar';
 import { Switcher } from './switcher';
+import { installTooltips } from './tooltip';
 import { type Actions, Toolbar } from './toolbar';
 
 // Set up the connection first, so no status event is missed.
@@ -53,6 +54,7 @@ function toast(message: string, iconName: IconName | null = 'done') {
 }
 
 async function start() {
+  installTooltips();
   const info = await bridge().info();
   const kind = info.kind;
   document.body.classList.add(`kind-${kind}`);

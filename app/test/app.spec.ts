@@ -275,6 +275,29 @@ test.describe.serial('scratchpad app', () => {
     await expect(main.locator('#toast')).toHaveText('Duplicated');
   });
 
+  test('Tab nests a list item and Shift-Tab brings it back', async () => {
+    const main = await windowOf('main');
+    await main.keyboard.press('ControlOrMeta+n');
+    await main.keyboard.type('Packing\n\n- bag\nlaptop');
+    await expect.poll(() => list().some((d) => d.title === 'Packing')).toBe(true);
+    const id = list().find((d) => d.title === 'Packing')!.id;
+    await main.keyboard.press('Tab');
+    await expect.poll(() => run('show', id)).toBe('Packing\n\n- bag\n  - laptop\n');
+    await main.keyboard.press('Shift+Tab');
+    await expect.poll(() => run('show', id)).toBe('Packing\n\n- bag\n- laptop\n');
+  });
+
+  test('toolbar buttons explain themselves on hover', async () => {
+    const main = await windowOf('main');
+    await main.locator('.toolbar .tool[data-action="pin"]').hover();
+    const tip = main.locator('.tip');
+    await expect(tip).toBeVisible();
+    await expect(tip).toContainText('Pin');
+    await expect(tip.locator('.kbd')).toHaveCount(3);
+    await main.mouse.move(600, 500);
+    await expect(tip).toBeHidden();
+  });
+
   test('Empty Trash deletes what is in the Trash, after asking', async () => {
     const id = run('new', 'Doomed').trim();
     run('trash', id);

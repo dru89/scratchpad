@@ -84,9 +84,14 @@
   --highlight-strong: #f5cd48;
   --on-highlight-strong: #1d1d1f;
   --clay: #b3402a;
+  --code-keyword: #7b3fa0;
+  --code-string: #3f6e2a;
+  --code-number: #9c4a12;
+  --code-type: #1d6b6b;
   --clay-soft: #fbeae6;
   --toast-bg: #1d1d1f;
   --toast-ink: #fafafa;
+  --toast-key: rgba(255, 255, 255, 0.16);
   --scrim: rgba(20, 20, 22, 0.16);
   --scroll-thumb: rgba(24, 24, 27, 0.2);
   --scroll-thumb-hover: rgba(24, 24, 27, 0.34);
@@ -147,9 +152,14 @@
     --highlight-strong: #dcb546;
     --on-highlight-strong: #1c1c1e;
     --clay: #f09078;
+    --code-keyword: #cfa8f5;
+    --code-string: #a3d18f;
+    --code-number: #f2ad7c;
+    --code-type: #86d4d2;
     --clay-soft: #3d2622;
     --toast-bg: #3a3a3e;
     --toast-ink: #ececee;
+    --toast-key: rgba(255, 255, 255, 0.12);
     --scrim: rgba(0, 0, 0, 0.42);
     --scroll-thumb: rgba(255, 255, 255, 0.18);
     --scroll-thumb-hover: rgba(255, 255, 255, 0.32);
@@ -655,6 +665,47 @@ input[type='search']::-webkit-search-cancel-button {
 .editor {
   flex: 1;
   min-height: 0;
+}
+
+/* Code in fenced blocks: a few muted colors, comments in ink-3, names in
+   the text's own ink, punctuation a step back. */
+.cm-code-keyword {
+  color: var(--code-keyword);
+}
+
+.cm-code-string {
+  color: var(--code-string);
+}
+
+.cm-code-number {
+  color: var(--code-number);
+}
+
+.cm-code-type {
+  color: var(--code-type);
+}
+
+.cm-code-comment {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+.cm-code-function {
+  font-weight: 600;
+}
+
+.cm-code-quiet {
+  color: var(--ink-2);
+}
+
+/* A tab is about three monospaced characters wide in prose, where spaces
+   are narrow, and four characters in code. */
+.cm-editor .cm-line {
+  tab-size: 1.75em;
+}
+
+.cm-editor .cm-line.cm-codeblock {
+  tab-size: 4;
 }
 
 /* Rhythm. A blank line the cursor isn't on is rhythm-gap tall, not a full
@@ -1221,6 +1272,43 @@ input[type='search']::-webkit-search-cancel-button {
   display: none;
 }
 
+/* ---- tooltips ------------------------------------------------------------- */
+
+.tip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 320px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--toast-bg);
+  color: var(--toast-ink);
+  font: 500 12px/16px var(--font-ui);
+  box-shadow: var(--shadow-toast);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  animation: sp-fade 80ms ease-out;
+}
+
+.tip-keys {
+  display: inline-flex;
+  flex: none;
+}
+
+.tip .kbd {
+  background: var(--toast-key);
+  box-shadow: none;
+  color: inherit;
+}
+
+.tip[hidden] {
+  display: none;
+}
+
 /* ---- scrollbars ------------------------------------------------------------
    A thin pill that thickens under the pointer. Don't also set scrollbar-width
    or scrollbar-color anywhere: Chromium drops these rules when either is set. */
@@ -1326,6 +1414,7 @@ body.kind-capture .toast {
 @media (prefers-reduced-motion: reduce) {
   .switcher,
   .switcher-box,
+  .tip,
   .toast {
     animation: none;
   }

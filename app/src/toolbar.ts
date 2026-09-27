@@ -5,7 +5,7 @@
 
 import type { WindowKind } from './bridge';
 import type { DraftController } from './controller';
-import { escapeHtml, kbd, shortcut } from './format';
+import { escapeHtml, kbd } from './format';
 import { type IconName, icon } from './icons';
 
 export interface Actions {
@@ -24,6 +24,7 @@ interface Tool {
   action: keyof Actions;
   icon: IconName;
   label: string;
+  /** Its shortcut, like "Mod+Shift+P", shown as keycaps in the tooltip. */
   keys: string;
   /** Makes it a toggle. */
   pressed?: boolean;
@@ -33,8 +34,7 @@ interface Tool {
 }
 
 function tool(t: Tool): string {
-  const title = `${t.label} (${t.keys})`;
-  return `<button class="tool" data-action="${t.action}" title="${escapeHtml(title)}" aria-label="${escapeHtml(t.label)}"${
+  return `<button class="tool" data-action="${t.action}" data-tip="${escapeHtml(t.label)}" data-keys="${t.keys}" aria-label="${escapeHtml(t.label)}"${
     t.pressed === undefined ? '' : ` aria-pressed="${t.pressed}"`
   }${t.disabled ? ' disabled' : ''}>${icon(t.icon)}${t.text ? `<span class="tool-label">${escapeHtml(t.text)}</span>` : ''}</button>`;
 }
@@ -42,7 +42,7 @@ function tool(t: Tool): string {
 const group = (...tools: string[]) => `<div class="tool-group">${tools.join('')}</div>`;
 
 function badge(text: string, opts: { lead: string; warn?: boolean; title?: string }): string {
-  return `<span class="badge${opts.warn ? ' warn' : ''}"${opts.title ? ` title="${escapeHtml(opts.title)}"` : ''}>${opts.lead}${escapeHtml(text)}</span>`;
+  return `<span class="badge${opts.warn ? ' warn' : ''}"${opts.title ? ` data-tip="${escapeHtml(opts.title)}"` : ''}>${opts.lead}${escapeHtml(text)}</span>`;
 }
 
 export class Toolbar {
@@ -74,7 +74,7 @@ export class Toolbar {
       action: 'pin',
       icon: 'pin',
       label: pinned ? 'Unpin' : 'Pin: keep this draft when you come back',
-      keys: shortcut('Mod+Shift+P'),
+      keys: 'Mod+Shift+P',
       pressed: pinned,
       text: capture && pinned ? 'Pinned' : '',
     });
@@ -82,16 +82,16 @@ export class Toolbar {
       action: 'float',
       icon: 'float',
       label: floating ? 'Stop floating on top' : 'Float on top',
-      keys: shortcut('Mod+Shift+F'),
+      keys: 'Mod+Shift+F',
       pressed: floating,
       text: capture && floating ? 'On top' : '',
     });
-    const copy = tool({ action: 'copyRich', icon: 'copy', label: 'Copy as rich text', keys: shortcut('Mod+Shift+C'), disabled: noDraft });
+    const copy = tool({ action: 'copyRich', icon: 'copy', label: 'Copy as rich text', keys: 'Mod+Shift+C', disabled: noDraft });
     const archive = tool({
       action: 'archive',
       icon: 'archive',
       label: archived ? 'Move to Inbox' : 'Archive',
-      keys: shortcut('Mod+Shift+A'),
+      keys: 'Mod+Shift+A',
       pressed: archived,
       disabled: noDraft,
     });
@@ -99,11 +99,11 @@ export class Toolbar {
       action: 'trash',
       icon: 'trash',
       label: trashed ? 'Restore from Trash' : 'Move to Trash',
-      keys: shortcut('Mod+Shift+Backspace'),
+      keys: 'Mod+Shift+Backspace',
       pressed: trashed,
       disabled: noDraft,
     });
-    const openWindow = tool({ action: 'openWindow', icon: 'window', label: 'Open in its own window', keys: shortcut('Mod+Shift+O'), disabled: noDraft });
+    const openWindow = tool({ action: 'openWindow', icon: 'window', label: 'Open in its own window', keys: 'Mod+Shift+O', disabled: noDraft });
 
     let badges = '';
     if (archived) badges += badge('Archived', { lead: icon('archive', 13) });
@@ -119,14 +119,14 @@ export class Toolbar {
     const title = `<div class="toolbar-title">${capture ? '' : `<span class="title-text">${escapeHtml(c.title)}</span>`}${badges}</div>`;
 
     if (capture) {
-      const done = `<button class="btn" data-action="done" title="Done: file it and start fresh (${shortcut('Mod+Enter')})">${icon('done')}Done${kbd('Mod+Enter')}</button>`;
+      const done = `<button class="btn" data-action="done" data-tip="Done: file it and start fresh" data-keys="Mod+Enter">${icon('done')}Done${kbd('Mod+Enter')}</button>`;
       this.el.innerHTML = `${group(pin, float)}${title}<div class="tools">${group(copy, archive, trash, openWindow)}${done}</div>`;
     } else if (kind === 'draft') {
       this.el.innerHTML = `${title}<div class="tools">${group(float)}${group(copy)}${group(archive, trash)}</div>`;
     } else {
       const lead = group(
-        tool({ action: 'toggleSidebar', icon: 'sidebar', label: 'Toggle sidebar', keys: shortcut('Mod+\\') }),
-        tool({ action: 'newDraft', icon: 'new', label: 'New draft', keys: shortcut('Mod+N') }),
+        tool({ action: 'toggleSidebar', icon: 'sidebar', label: 'Toggle sidebar', keys: 'Mod+\\' }),
+        tool({ action: 'newDraft', icon: 'new', label: 'New draft', keys: 'Mod+N' }),
       );
       this.el.innerHTML = `${lead}${title}<div class="tools">${group(pin, float)}${group(copy)}${group(archive, trash)}${group(openWindow)}</div>`;
     }

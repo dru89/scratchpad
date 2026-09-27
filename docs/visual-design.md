@@ -27,6 +27,7 @@ The palette is four materials: paper, graphite ink, a ballpoint pen and a highli
 - `--accent` is the ballpoint. It marks where you are and what's on: the caret, links, focus rings, pressed toggles, the checked task box. Don't use it for decoration or large fills.
 - `--highlight` is the highlighter: find matches and matched words in snippets. `--highlight-strong` is the current match. Nothing else is yellow.
 - `--clay` is for states that need a second look but aren't errors: Offline, In Trash. There is no error red; failures are said in a toast.
+- `--code-keyword`, `--code-string`, `--code-number` and `--code-type` color code in fenced blocks, and nothing else. They're muted on purpose, so code stays calm next to prose; comments are `--ink-3` italic, names are plain ink, and punctuation is `--ink-2`.
 - `--hover` and `--selected` are translucent, so they work on every surface. Controls are flat fills: the active tab is `--selected`, and the resting filter field is `--hover`. Don't put white chips with shadows on tinted tracks.
 
 Every text color meets 4.5:1 on every surface it's used on, in both themes, including hovered and selected rows; marks (`--ink-4`, icons, the focus ring) meet 3:1. A new color has to meet the same bar in light and dark before it goes in.
@@ -47,7 +48,9 @@ Rhythm is where most of the calm comes from:
 - h1 to h3 get `--rhythm-heading` of padding above and nothing below, so a heading sits with the text it introduces.
 - A bullet's dot sits in a fixed 0.6em box, so bullet text lines up with numbered text. Nested items step in by 0.85em per level (`.cm-list-2` to `.cm-list-4`) whatever indentation they were typed with, which puts a nested dot under its parent's text. The typed indentation shows again on the cursor's line.
 - Quotes indent 1.35em from a 2px `--ink-4` bar and get 0.3em more room above and below. The `>` is hidden off the cursor's line; the bar is a background, so revealing it doesn't move anything.
-- Code blocks are a `--paper-sunk` band with rounded ends. Tables have rules between rows and none between columns, and align to the text edge.
+- Code blocks are a `--paper-sunk` band with rounded ends, highlighted by the language named after the fence. Tables have rules between rows and none between columns, and align to the text edge.
+- The selection is `--selection`, drawn over the text rather than under it, so code and inline code backgrounds can't hide it ([`editor/selection.ts`](../app/src/editor/selection.ts)). Each line's piece ends at its text, and a selected line break is a short block after it, so a triple-clicked line reads as that line alone. There's no caret while text is selected.
+- A tab is about three monospaced characters wide in prose and four in code.
 
 The text column is `--measure` (40em including side padding, about 70 characters). The capture window sets it to `none` and uses its width.
 
@@ -59,6 +62,7 @@ Line classes come from [`editor/livepreview.ts`](../app/src/editor/livepreview.t
 | `.cm-bullet`, `.cm-rule`, `.cm-task` (+ `.is-done`) | display-only widgets in livepreview.ts |
 | `.cm-link-text` | the rendered text of a link, livepreview.ts |
 | `.cm-strong`, `.cm-em`, `.cm-strike`, `.cm-inline-code`, `.cm-link`, `.cm-url`, `.cm-mark` | HighlightStyle in setup.ts |
+| `.cm-code-keyword`, `-string`, `-number`, `-type`, `-comment`, `-function`, `-quiet` | HighlightStyle in setup.ts, for code in fenced blocks |
 | `.cm-table-wrap`, and `.cm-searchMatch` in its cells while find is open | the table widget in tables.ts |
 
 Two CodeMirror rules to keep in mind. CodeMirror mounts its own styles after `style.css`, so rules for line classes are written `.cm-editor .cm-line.cm-x` to outrank its default line padding, and anything else that fights its base theme goes in `EditorView.theme` in setup.ts. And use padding, never margins, on lines: CodeMirror measures line boxes, and margins throw that off.
@@ -78,6 +82,8 @@ Two CodeMirror rules to keep in mind. CodeMirror mounts its own styles after `st
 The main toolbar has two ends. The left holds what acts on the app (toggle sidebar, new draft). The right holds what acts on this draft, in groups separated by a 10px gap: pin and float (the window), copy (the output), archive and trash (its fate), and open in its own window. Groups are separated by space, not divider lines.
 
 Pin, float, archive and trash are toggles with `aria-pressed`. Off, they look like every other tool: an `--ink-4` icon on nothing. On, they take `--accent-soft` and `--accent`, and the part of the icon marked `.i-fill` fills in. In the capture window, a pressed pin or float also shows its word ("Pinned", "On top"). Archive and trash stay archive and trash when a draft is archived or trashed: they show as pressed, pressing again undoes it, and the badge after the title names the state. The tooltip always says what pressing will do next, with the shortcut.
+
+Tooltips are the app's own ([`tooltip.ts`](../app/src/tooltip.ts)), not `title` attributes, which Electron shows late or not at all on macOS. Anything with `data-tip` gets one, with `data-keys` ("Mod+Shift+P") shown as keycaps. They're a small `--toast-bg` pill that appears after a short hover or on keyboard focus, and at once when moving from one tool to the next.
 
 ## Iconography
 

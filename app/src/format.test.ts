@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kbd, localTitle, markMatches, relativeTime, searchTerms, shortcut } from './format';
+import { kbd, localTitle, markMatches, relativeTime, searchTerms } from './format';
 import { shouldRollOver } from './idle';
 
 describe('localTitle', () => {
@@ -57,6 +57,13 @@ describe('kbd', () => {
   it('makes one keycap per key, with glyphs for Enter and Backspace', () => {
     expect(kbd('Mod+Enter', false)).toBe('<kbd class="kbd">Ctrl</kbd><kbd class="kbd">↵</kbd>');
     expect(kbd('Mod+Enter', true)).toBe('<kbd class="kbd">⌘</kbd><kbd class="kbd">↵</kbd>');
+  });
+
+  it('uses macOS glyphs in menu order on macOS', () => {
+    const caps = (html: string) => [...html.matchAll(/<kbd class="kbd">([^<]*)<\/kbd>/g)].map((m) => m[1]).join(' ');
+    expect(caps(kbd('Mod+Shift+P', true))).toBe('⇧ ⌘ P');
+    expect(caps(kbd('Mod+Alt+F', true))).toBe('⌥ ⌘ F');
+    expect(caps(kbd('Mod+Shift+P', false))).toBe('Ctrl Shift P');
     expect(kbd('Shift+Backspace')).toBe('<kbd class="kbd">Shift</kbd><kbd class="kbd">⌫</kbd>');
   });
 });
@@ -72,19 +79,5 @@ describe('shouldRollOver', () => {
     expect(shouldRollOver({ ...base, loadedAt: 50_000 })).toBe(false);
     expect(shouldRollOver({ ...base, modifiedAt: 50_000 })).toBe(false);
     expect(shouldRollOver({ ...base, lastLocalEdit: 50_000 })).toBe(false);
-  });
-});
-
-describe('shortcut', () => {
-  it('spells out modifiers on Linux', () => {
-    expect(shortcut('Mod+Shift+P', false)).toBe('Ctrl+Shift+P');
-    expect(shortcut('Mod+\\', false)).toBe('Ctrl+\\');
-  });
-
-  it('uses macOS glyphs in menu order', () => {
-    expect(shortcut('Mod+Shift+P', true)).toBe('⇧⌘P');
-    expect(shortcut('Mod+Alt+F', true)).toBe('⌥⌘F');
-    expect(shortcut('Mod+Shift+Backspace', true)).toBe('⇧⌘⌫');
-    expect(shortcut('Mod+Enter', true)).toBe('⌘↩');
   });
 });

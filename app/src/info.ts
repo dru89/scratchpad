@@ -52,7 +52,7 @@ export class InfoPanel {
     const chars = [...d.text].length;
     const row = (label: string, value: string) => `<dt>${label}</dt><dd>${value}</dd>`;
     const copyable = (value: string, what: string) =>
-      `<code title="${escapeHtml(value)}">${escapeHtml(value)}</code><button class="btn" data-copy="${what}">Copy</button>`;
+      `<code data-tip="${escapeHtml(value)}">${escapeHtml(value)}</code><button class="btn" data-copy="${what}">Copy</button>`;
     this.box.innerHTML = `
       <h2 class="info-title">${escapeHtml(d.title)}</h2>
       <dl class="info-rows">

@@ -85,6 +85,7 @@ The install script adds scratchpad to your application launcher and starts it in
 | Inbox, Archive, Trash | ⌘1, ⌘2, ⌘3 | Ctrl+1, Ctrl+2, Ctrl+3 |
 | Filter the sidebar | ⇧⌘L | Ctrl+Shift+L |
 | Find, and find and replace | ⌘F, ⌥⌘F | Ctrl+F, Ctrl+H |
+| Nest a list item, or move it back out | Tab, ⇧Tab | Tab, Shift+Tab |
 | Hide the capture window | Esc | Esc |
 
 Closing the main window keeps scratchpad running for the hotkey. Quit from the menu, or with ⌘Q (Ctrl+Q on Linux).

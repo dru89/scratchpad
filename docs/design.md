@@ -130,6 +130,7 @@ Each editor window keeps its own Loro copy of its draft (`loro-crdt` WASM in the
 
 - **Concurrent edits** from agents, other windows or other devices merge in the CRDT, and CodeMirror moves the cursor along with any text that shifts around it.
 - **If the daemon restarts,** the window keeps working and catches up by version on reconnect.
+- **Tab** in a list makes each selected item a child of the item above it, re-indenting it with spaces to where that item's text starts, and Shift+Tab moves it back out to its parent's level. An item's children move with it. Anywhere else, Tab inserts a tab or indents every selected line. Lines in fenced code are never treated as list items ([`app/src/editor/indent.ts`](../app/src/editor/indent.ts)).
 - **Undo** uses Loro's `UndoManager`, so Ctrl+Z reverts only your own edits, never an agent's. Undo restores the selection saved as Loro cursors, and redo leaves the cursor at the end of what it restored. A remote edit that arrives mid-typing splits the undo group; merging adjacent steps is a later refinement.
 - **The binding is our own**, about 150 lines. The published `loro-codemirror` drops text changes that share a batch with a `meta` change.
 
@@ -181,6 +182,7 @@ Ctrl on Linux, Cmd on macOS.
 | Filter the sidebar | Ctrl+Shift+L |
 | Find in the draft | Ctrl+F |
 | Find and replace | Ctrl+H (Cmd+Option+F on macOS, where Cmd+H hides the app) |
+| Nest a list item under the one above, or move it back out | Tab, Shift+Tab |
 
 Archiving or trashing from the main or capture window moves that window on to a new draft; a draft's own window stays on it and shows a badge.
 

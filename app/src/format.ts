@@ -56,26 +56,22 @@ export function escapeHtml(s: string): string {
 export const isMac = typeof navigator !== 'undefined' && navigator.platform.startsWith('Mac');
 const KEY_GLYPHS: Record<string, string> = { Enter: '↵', Backspace: '⌫', Up: '↑', Down: '↓' };
 
-const MAC_MODIFIERS = ['Ctrl', 'Alt', 'Shift', 'Mod'];
-const MAC_GLYPHS: Record<string, string> = { Ctrl: '⌃', Alt: '⌥', Shift: '⇧', Mod: '⌘', Enter: '↩', Backspace: '⌫' };
+/** macOS modifier glyphs, in the order macOS menus list them. */
+const MAC_MODIFIERS: Record<string, string> = { Ctrl: '⌃', Alt: '⌥', Shift: '⇧', Mod: '⌘' };
+const MAC_ORDER = Object.keys(MAC_MODIFIERS);
 
 /**
- * A shortcut as text, for tooltips: shortcut('Mod+Shift+P') is "Ctrl+Shift+P",
- * or "⇧⌘P" on macOS, with the modifiers in the order macOS menus use.
+ * Keycaps, one per key: kbd('Mod+Shift+A'). Mod is Ctrl; on macOS it's ⌘,
+ * the other modifiers are glyphs too, and they come in menu order (⇧⌘A).
  */
-export function shortcut(keys: string, mac = isMac): string {
-  const parts = keys.split('+');
-  if (!mac) return parts.map((k) => (k === 'Mod' ? 'Ctrl' : k)).join('+');
-  const key = parts.pop()!;
-  parts.sort((a, b) => MAC_MODIFIERS.indexOf(a) - MAC_MODIFIERS.indexOf(b));
-  return [...parts, key].map((k) => MAC_GLYPHS[k] ?? k).join('');
-}
-
-/** Keycaps, one per key: kbd('Mod+Shift+A'). Mod is Ctrl, or ⌘ on macOS. */
 export function kbd(keys: string, mac = isMac): string {
-  return keys
-    .split('+')
-    .map((k) => `<kbd class="kbd">${escapeHtml(k === 'Mod' ? (mac ? '⌘' : 'Ctrl') : (KEY_GLYPHS[k] ?? k))}</kbd>`)
+  let parts = keys.split('+');
+  if (mac) {
+    const key = parts.pop()!;
+    parts = [...parts.sort((a, b) => MAC_ORDER.indexOf(a) - MAC_ORDER.indexOf(b)).map((k) => MAC_MODIFIERS[k] ?? k), key];
+  }
+  return parts
+    .map((k) => `<kbd class="kbd">${escapeHtml(k === 'Mod' ? 'Ctrl' : (KEY_GLYPHS[k] ?? k))}</kbd>`)
     .join('');
 }
 

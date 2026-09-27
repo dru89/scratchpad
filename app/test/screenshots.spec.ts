@@ -51,7 +51,9 @@ Three things to settle before the **planning review** on Friday. Background is i
 3. Send the summary once it's *actually* short
 
 \`\`\`ts
-const draft = await scratchpad.create({ text: summary });
+// Keep the summary where everyone can find it.
+const draft = await scratchpad.create({ text: summary, retries: 3 });
+console.log(\`Saved \${draft.id}\`, true);
 \`\`\`
 `,
   },
@@ -281,6 +283,26 @@ test.describe.serial('design screenshots', () => {
     await shot(main, '17-get-info');
     await main.keyboard.press('Escape');
 
+    // A highlighted code block.
+    await cursorAtEndOf(main, 'Send the summary');
+    await main.locator('.cm-line', { hasText: 'Keep the summary' }).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await shot(main, '21-code-highlighting');
+    await shot(main, '22-code-highlighting-dark', 'dark');
+
+    // A selection running into a code block, and a triple-clicked line.
+    await cursorAtEndOf(main, 'Draft the sync milestones');
+    await main.keyboard.press('Home');
+    for (let i = 0; i < 6; i++) await main.keyboard.press('Shift+ArrowDown');
+    await shot(main, '18-selection-into-code');
+    await main.locator('.cm-line', { hasText: 'Ship sync before' }).click({ clickCount: 3 });
+    await shot(main, '19-triple-clicked-line');
+
+    // A tooltip.
+    await main.locator('.toolbar .tool[data-action="float"]').hover();
+    await expect(main.locator('.tip')).toBeVisible();
+    await shot(main, '20-tooltip');
+    await main.mouse.move(600, 500);
+
     // The Trash, with a trashed draft open.
     await main.keyboard.press('ControlOrMeta+3');
     await main.locator('#sidebar .item-title', { hasText: 'meeting at 3' }).click();
@@ -299,7 +321,18 @@ test.describe.serial('design screenshots', () => {
     await expect(main.locator('.badge.warn')).toHaveCount(0, { timeout: 15_000 });
 
     // The capture window: empty, then in use with pin and float on.
-    run('capture', '--new');
+    // Right after the offline shots the app may still be reconnecting to
+    // the daemon, and capture fails until it has.
+    await expect
+      .poll(() => {
+        try {
+          run('capture', '--new');
+          return true;
+        } catch {
+          return false;
+        }
+      })
+      .toBe(true);
     const capture = await windowOf('capture');
     await resize('capture', 560, 380);
     await expect(capture.locator('.cm-placeholder')).toBeVisible();

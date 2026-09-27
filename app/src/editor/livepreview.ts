@@ -63,7 +63,12 @@ const rule = Decoration.replace({ widget: new RuleWidget() });
 const tasks = [false, true].map((done) => Decoration.replace({ widget: new TaskWidget(done) }));
 
 export function touches(state: EditorState, from: number, to: number): boolean {
-  for (const r of state.selection.ranges) if (r.from <= to && r.to >= from) return true;
+  for (const r of state.selection.ranges) {
+    // A selection that ends where a line starts, like a triple-clicked
+    // line, doesn't reach into that line.
+    const end = r.to > r.from && state.doc.lineAt(r.to).from === r.to ? r.to - 1 : r.to;
+    if (r.from <= to && end >= from) return true;
+  }
   return false;
 }
 
