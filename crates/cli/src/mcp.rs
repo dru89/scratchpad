@@ -10,7 +10,7 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use rmcp::{ErrorData as McpError, ServerHandler, ServiceExt, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use scratchpad_core::paths::Paths;
-use scratchpad_core::protocol::{DraftDetail, DraftState, DraftSummary, ListResult, RpcError};
+use scratchpad_core::protocol::{DraftDetail, DraftState, DraftSummary, ListResult, RpcError, draft_link};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -34,7 +34,9 @@ when nobody has edited it.
 
 Never pair a version with text you didn't read at that version; the merge would treat the difference as your deletions. \
 append_to_draft adds to the end and needs no version. Ids can be shortened to any unique prefix. Nothing here deletes \
-permanently: trash_draft moves a draft to the Trash, which empties after 30 days.";
+permanently: trash_draft moves a draft to the Trash, which empties after 30 days.
+
+Each draft has a url, scratchpad://open/<id>, that opens it in the app. Give it to the user when you point them at a draft.";
 
 #[derive(Clone)]
 pub struct Scratchpad {
@@ -102,6 +104,7 @@ pub struct AppendArgs {
 fn summary_json(d: &DraftSummary) -> Value {
     let mut v = json!({
         "id": d.id,
+        "url": draft_link(&d.id),
         "title": d.title,
         "state": d.state,
         "created": iso8601(d.created_at),

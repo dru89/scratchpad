@@ -275,6 +275,12 @@ test.describe.serial('design screenshots', () => {
     await shot(main, '10-copied-as-rich-text-toast');
     await expect(main.locator('#toast')).toBeHidden({ timeout: 5000 });
 
+    // Get Info.
+    await main.keyboard.press('ControlOrMeta+i');
+    await expect(main.locator('.info-box')).toBeVisible();
+    await shot(main, '17-get-info');
+    await main.keyboard.press('Escape');
+
     // The Trash, with a trashed draft open.
     await main.keyboard.press('ControlOrMeta+3');
     await main.locator('#sidebar .item-title', { hasText: 'meeting at 3' }).click();

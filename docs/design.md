@@ -107,6 +107,7 @@ Every `id` parameter accepts a full id or any unique prefix of one, case-insensi
 | `drafts.append` | `id`, `text`, `ensureNewline?` | With `ensureNewline`, the text starts on a new line if the draft doesn't already end with one. The CLI and MCP tool set it. |
 | `drafts.setState` | `id`, `state` | Doesn't change `modifiedAt`. |
 | `drafts.discard` | `id` | Deletes a draft outright. Refused unless the body is empty. |
+| `drafts.emptyTrash` | | Deletes everything in the Trash now and returns `deleted`, the count. The app asks first; the CLI and MCP server don't offer it. |
 | `drafts.render` | `id` or `text` | `{html}`: GitHub-flavored HTML with raw HTML dropped, for rich copy. |
 | `drafts.subscribe` / `unsubscribe` | | Notifications: `drafts.changed {summary}`, `drafts.removed {id}`. |
 | `doc.open` | `id`, `version?` (a version vector) | A snapshot, or the updates since `version`, plus the daemon's version vector. Starts `doc.update {id, update}` notifications for that draft. One task handles every request in order, so the reply always reaches the client before any update for that draft. |
@@ -174,6 +175,7 @@ Ctrl on Linux, Cmd on macOS.
 | Archive / move to Inbox | Ctrl+Shift+A |
 | Trash / restore | Ctrl+Shift+Backspace |
 | Open the draft in its own window | Ctrl+Shift+O |
+| Get info: place, dates, length, ID and link | Ctrl+I |
 | Toggle the sidebar | Ctrl+\ |
 | Inbox / Archive / Trash | Ctrl+1 / Ctrl+2 / Ctrl+3 |
 | Filter the sidebar | Ctrl+Shift+L |
@@ -183,6 +185,10 @@ Ctrl on Linux, Cmd on macOS.
 Archiving or trashing from the main or capture window moves that window on to a new draft; a draft's own window stays on it and shows a badge.
 
 Closing the main or capture window hides it, so the app keeps running for the hotkey; Ctrl+Q quits. Launching the app again shows the main window.
+
+**The Draft menu** in the menu bar has these actions for the focused window's draft, plus Duplicate and a Copy submenu (Contents, Title, Link, ID). The sidebar's context menu has the same for any draft: open in a new or the capture window, archive or trash, Duplicate, Get Info, Copy (Contents, Rich Text, Title, Link, ID), and on the Trash tab, Empty Trash. Duplicate makes a new Inbox draft with the same text and opens it. The window carries out every action, so the keys and the menu go through the same code; on macOS the menu takes the keys, and on Linux it only shows them.
+
+**Links.** `scratchpad://open/<id>` opens a draft in its own window, and `scratchpad://capture` summons the capture window. The CLI's `--json` output and the MCP results include each draft's link as `url`, and `scratchpad link <id>` prints one. macOS registers the scheme from the app bundle and delivers links through `open-url`; on Linux the install script makes the desktop entry the handler, and links arrive on the command line.
 
 **Hotkey plumbing.**
 - On Linux, a KDE custom command runs `scratchpad capture`, which reaches the app through the daemon. KDE's portal-based global shortcuts are unreliable on this Plasma version; a custom command doesn't use the portal. The app then focuses the window through KWin, since Wayland won't let it take focus itself.

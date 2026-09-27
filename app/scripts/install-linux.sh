@@ -3,7 +3,8 @@
 # Plasma first):
 #
 #   ~/.local/bin/scratchpad-app      a link to this checkout's launcher
-#   applications/…scratchpad.desktop  so it shows up in the launcher
+#   applications/…scratchpad.desktop  so it shows up in the launcher and
+#                                     opens scratchpad:// links
 #   autostart/…scratchpad.desktop     starts it in the background at login
 #   applications/net.local.scratchpad-capture.desktop
 #                                     a "scratchpad capture" command with
@@ -29,6 +30,8 @@ for arg in "$@"; do
     --no-autostart) autostart=0 ;;
     --uninstall)
       rm -f "$bin/scratchpad-app" "$app_entry" "$autostart_entry" "$capture_entry"
+      # The scratchpad:// association in mimeapps.list points at the removed
+      # entry now, which is harmless; xdg-mime has no way to unset it.
       command -v kbuildsycoca6 >/dev/null && kbuildsycoca6 >/dev/null 2>&1 || true
       echo "Removed the scratchpad app's launcher, desktop entries, and autostart."
       exit 0
@@ -55,12 +58,15 @@ cat >"$app_entry" <<EOF
 Type=Application
 Name=scratchpad
 Comment=Where text starts
-Exec=$bin/scratchpad-app
+Exec=$bin/scratchpad-app %u
 Icon=accessories-text-editor
 Terminal=false
 Categories=Utility;TextEditor;
+MimeType=x-scheme-handler/scratchpad;
 StartupWMClass=scratchpad
 EOF
+# scratchpad:// links open drafts in the app.
+command -v xdg-mime >/dev/null && xdg-mime default dev.unremarkable.scratchpad.desktop x-scheme-handler/scratchpad || true
 
 if [[ $autostart == 1 ]]; then
   mkdir -p "$autostart_dir"

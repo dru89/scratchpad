@@ -4,8 +4,10 @@
 import './style.css';
 import { bridge, type DraftState } from './bridge';
 import { DraftController } from './controller';
+import { type CopyWhat, copyDraft, duplicateDraft } from './draftops';
 import { escapeHtml } from './format';
 import { type IconName, icon } from './icons';
+import { InfoPanel } from './info';
 import { Rpc } from './rpc';
 import { Sidebar } from './sidebar';
 import { Switcher } from './switcher';
@@ -69,7 +71,12 @@ async function start() {
 
   const controller = new DraftController(document.getElementById('editor')!, rpc, kind, info.prefs, info.idleMs);
   const switcher = new Switcher(rpc, controller);
-  const sidebar = kind === 'main' ? new Sidebar(document.getElementById('sidebar')!, rpc, controller) : null;
+  const infoPanel = new InfoPanel(rpc, (m) => toast(m), () => controller.focus());
+  const showInfo = (id: string) => void infoPanel.show(id).catch(() => toast("Couldn't get info: scratchpadd isn't reachable", null));
+  const sidebar =
+    kind === 'main'
+      ? new Sidebar(document.getElementById('sidebar')!, rpc, controller, { toast: (m) => toast(m), info: showInfo })
+      : null;
 
   const setState = async (state: DraftState, message: string, iconName: IconName) => {
     await controller.setState(state);
@@ -126,6 +133,28 @@ async function start() {
 
   toolbar = new Toolbar(document.getElementById('toolbar')!, controller, actions, status);
 
+  // The Draft menu's actions beyond the toolbar's, on this window's draft.
+  const copyOwn = async (what: CopyWhat) => {
+    const id = controller.draftId;
+    if (!id || controller.isBlank()) return;
+    try {
+      toast(await copyDraft(rpc, id, what, { text: controller.text, title: controller.title }));
+    } catch {
+      toast("Couldn't copy: scratchpadd isn't reachable", null);
+    }
+  };
+  const duplicate = async () => {
+    if (!controller.draftId || controller.isBlank()) return;
+    const copy = await duplicateDraft(rpc, controller.text);
+    // A draft's own window stays on its draft, so the copy gets a window too.
+    if (kind === 'draft') await bridge().openDraft(copy);
+    else await controller.load(copy);
+    toast('Duplicated');
+  };
+  const getInfo = () => {
+    if (controller.draftId) showInfo(controller.draftId);
+  };
+
   const params = new URLSearchParams(location.search);
   const ready = controller.init(kind === 'draft' ? (params.get('draft') ?? undefined) : info.prefs.draftId);
 
@@ -164,6 +193,7 @@ async function start() {
     'Mod-Shift-a': actions.archive,
     'Mod-Shift-Backspace': actions.trash,
     'Mod-Shift-o': actions.openWindow,
+    'Mod-i': getInfo,
     'Mod-\\': actions.toggleSidebar,
     'Mod-1': () => sidebar?.setTab('inbox'),
     'Mod-2': () => sidebar?.setTab('archived'),
@@ -177,16 +207,37 @@ async function start() {
     (e) => {
       const name = keyName(e);
       const run = shortcuts[name];
-      if (!run || (switcher.isOpen && name !== 'Mod-k')) return;
+      if (!run || infoPanel.isOpen || (switcher.isOpen && name !== 'Mod-k')) return;
       e.preventDefault();
       e.stopPropagation();
       void run();
     },
     true,
   );
+  // From the Draft menu. On Linux the keys arrive above as well; on macOS the
+  // menu takes them and sends them here.
+  const menuActions: Record<string, () => unknown> = {
+    newDraft: actions.newDraft,
+    pin: actions.pin,
+    float: actions.float,
+    copyRich: actions.copyRich,
+    copyContents: () => copyOwn('contents'),
+    copyTitle: () => copyOwn('title'),
+    copyLink: () => copyOwn('link'),
+    copyId: () => copyOwn('id'),
+    duplicate,
+    info: getInfo,
+    openWindow: actions.openWindow,
+    archive: actions.archive,
+    trash: actions.trash,
+  };
+  bridge().onMenuAction((action) => {
+    if (!switcher.isOpen && !infoPanel.isOpen) void menuActions[action]?.();
+  });
+
   // Bubble phase, so the search panel and switcher get Escape first.
   window.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || e.defaultPrevented || kind !== 'capture' || switcher.isOpen) return;
+    if (e.key !== 'Escape' || e.defaultPrevented || kind !== 'capture' || switcher.isOpen || infoPanel.isOpen) return;
     if (controller.isBlank()) controller.newDraft();
     bridge().hide();
   });

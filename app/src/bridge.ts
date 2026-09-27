@@ -22,6 +22,13 @@ export interface Summon {
   draftId?: string;
 }
 
+/** A context menu item: `id` "-" is a separator, and an item with a submenu has no action of its own. */
+export interface MenuItem {
+  id: string;
+  label: string;
+  submenu?: MenuItem[];
+}
+
 export interface Bridge {
   daemon: {
     send(line: string): void;
@@ -38,8 +45,13 @@ export interface Bridge {
   openDraft(id: string): Promise<void>;
   openInCapture(id: string): Promise<void>;
   showMain(): Promise<void>;
-  contextMenu(items: { id: string; label: string }[]): Promise<string | null>;
+  contextMenu(items: MenuItem[]): Promise<string | null>;
+  /** Actions from the Draft menu, for this window's draft. */
+  onMenuAction(cb: (action: string) => void): void;
   copyRich(markdown: string): Promise<void>;
+  copyText(text: string): Promise<void>;
+  /** Asks, then empties the Trash. */
+  emptyTrash(): Promise<void>;
   quit(): Promise<void>;
 }
 

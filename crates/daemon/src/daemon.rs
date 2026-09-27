@@ -239,6 +239,7 @@ impl Daemon {
             }
             "drafts.setState" => self.set_state(params(p)?),
             "drafts.discard" => self.discard(params(p)?),
+            "drafts.emptyTrash" => self.empty_trash(),
             "drafts.render" => self.render(params(p)?),
             "drafts.subscribe" | "drafts.unsubscribe" => {
                 if let Some(c) = self.clients.get_mut(&client) {
@@ -437,6 +438,16 @@ impl Daemon {
         }
         self.delete(&id)?;
         Ok(json!({ "id": id }))
+    }
+
+    /// Deletes everything in the Trash now: the app's Empty Trash.
+    fn empty_trash(&mut self) -> Result<Value, RpcError> {
+        self.flush_dirty(true);
+        let ids = self.store.trashed_before(i64::MAX).map_err(internal)?;
+        for id in &ids {
+            self.delete(id)?;
+        }
+        Ok(json!({ "deleted": ids.len() }))
     }
 
     fn render(&mut self, p: proto::RenderParams) -> Result<Value, RpcError> {
@@ -904,6 +915,21 @@ mod tests {
         assert_eq!(h.call(&mut c, "drafts.discard", json!({ "id": full })).0.unwrap_err().code, codes::NOT_EMPTY);
         h.ok(&mut c, "drafts.discard", json!({ "id": empty }));
         assert_eq!(titles(&h.ok(&mut c, "drafts.list", json!({}))), ["keep me"]);
+    }
+
+    #[test]
+    fn empty_trash_deletes_only_trashed_drafts() {
+        let mut h = Harness::new();
+        let mut c = h.client();
+        h.ok(&mut c, "drafts.create", json!({ "text": "keep me" }));
+        for text in ["old", "older"] {
+            let id = h.ok(&mut c, "drafts.create", json!({ "text": text }))["id"].clone();
+            h.ok(&mut c, "drafts.setState", json!({ "id": id, "state": "trashed" }));
+        }
+        assert_eq!(h.ok(&mut c, "drafts.emptyTrash", json!({}))["deleted"], 2);
+        assert!(titles(&h.ok(&mut c, "drafts.list", json!({ "states": ["trashed"] }))).is_empty());
+        assert_eq!(titles(&h.ok(&mut c, "drafts.list", json!({}))), ["keep me"]);
+        assert_eq!(h.ok(&mut c, "drafts.emptyTrash", json!({}))["deleted"], 0);
     }
 
     #[test]

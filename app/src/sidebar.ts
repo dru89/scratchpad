@@ -4,6 +4,7 @@
 
 import { bridge, type DraftState, type DraftSummary } from './bridge';
 import type { DraftController } from './controller';
+import { COPY_ITEMS, type CopyWhat, copyDraft, duplicateDraft, getDraft } from './draftops';
 import { escapeHtml, kbd, markMatches, relativeTime, searchTerms, shortcut } from './format';
 import { icon } from './icons';
 import type { Rpc } from './rpc';
@@ -45,6 +46,7 @@ export class Sidebar {
     private root: HTMLElement,
     private rpc: Rpc,
     private controller: DraftController,
+    private ui: { toast(message: string): void; info(id: string): void },
   ) {
     root.innerHTML = `
       <div class="tabs" role="tablist"></div>
@@ -152,18 +154,35 @@ export class Sidebar {
   private async contextMenu(id: string) {
     const d = this.items.find((x) => x.id === id);
     if (!d) return;
+    const sep = { id: '-', label: '' };
     const items = [
       { id: 'window', label: 'Open in New Window' },
       { id: 'capture', label: 'Open in Capture Window' },
-      { id: '-', label: '' },
+      sep,
       d.state === 'archived' ? { id: 'inbox', label: 'Move to Inbox' } : { id: 'archived', label: 'Archive' },
       d.state === 'trashed' ? { id: 'inbox', label: 'Restore from Trash' } : { id: 'trashed', label: 'Move to Trash' },
+      sep,
+      { id: 'duplicate', label: 'Duplicate' },
+      { id: 'info', label: 'Get Info' },
+      { id: 'copy', label: 'Copy', submenu: COPY_ITEMS },
+      ...(this.tab === 'trashed' ? [sep, { id: 'empty', label: 'Empty Trash…' }] : []),
     ];
     const choice = await bridge().contextMenu(items);
-    if (choice === 'window') await bridge().openDraft(id);
-    else if (choice === 'capture') await bridge().openInCapture(id);
-    else if (choice === 'inbox' || choice === 'archived' || choice === 'trashed') {
-      await this.rpc.call('drafts.setState', { id, state: choice });
+    try {
+      if (choice === 'window') await bridge().openDraft(id);
+      else if (choice === 'capture') await bridge().openInCapture(id);
+      else if (choice === 'inbox' || choice === 'archived' || choice === 'trashed') {
+        await this.rpc.call('drafts.setState', { id, state: choice });
+      } else if (choice === 'duplicate') {
+        const copy = await duplicateDraft(this.rpc, (await getDraft(this.rpc, id)).text);
+        if (this.tab !== 'inbox') this.setTab('inbox');
+        await this.controller.load(copy);
+        this.ui.toast('Duplicated');
+      } else if (choice === 'info') this.ui.info(id);
+      else if (choice?.startsWith('copy:')) this.ui.toast(await copyDraft(this.rpc, id, choice.slice(5) as CopyWhat));
+      else if (choice === 'empty') await bridge().emptyTrash();
+    } catch {
+      this.ui.toast("That didn't work: scratchpadd isn't reachable");
     }
   }
 

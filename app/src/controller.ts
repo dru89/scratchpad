@@ -47,6 +47,11 @@ export class DraftController {
     return this.session?.id ?? null;
   }
 
+  /** The draft's markdown, as this window has it. */
+  get text(): string {
+    return this.view.state.doc.toString();
+  }
+
   get title(): string {
     return localTitle(this.view.state.doc.toString()) || 'New draft';
   }

@@ -16,6 +16,15 @@ files:
   - package.json
 # The app looks for the daemon here (electron/paths.ts), and the CLI finds
 # the daemon beside itself.
+# scratchpad:// links open drafts (electron/main.ts).
+protocols:
+  - name: scratchpad
+    schemes: [scratchpad]
+# Where the app looks for updates, and where CI's releases go.
+publish:
+  provider: github
+  owner: dru89
+  repo: scratchpad
 extraResources:
   - from: ../target/release/scratchpadd
     to: bin/scratchpadd

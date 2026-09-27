@@ -32,6 +32,8 @@ It's inspired by [Drafts](https://getdrafts.com), and it runs on macOS and Linux
 
 **Windows your way.** Open any draft in its own window, and float any window above the others.
 
+**Links to drafts.** Every draft has a link, like `scratchpad://open/01M3G7C7CR24T3SX6X10R5R6S8`, that opens it in the app. Copy it from the Draft menu or the sidebar's context menu and paste it anywhere you keep notes, tasks or chat.
+
 **Made for agents too.** A command-line tool and an MCP server let scripts and AI agents search, read, create and edit drafts. Everything that edits a draft, whether that's you, an agent or another window, makes versioned edits that merge. An agent can revise a draft while you're typing in it without losing your words, and undo only undoes your own typing.
 
 **Local and fast.** Your drafts stay in a database on your computer. Typing never waits on anything: each window edits its own copy of the draft and syncs with a small background service.
@@ -43,7 +45,7 @@ It's inspired by [Drafts](https://getdrafts.com), and it runs on macOS and Linux
 For Macs with Apple silicon.
 
 1. Download the `.dmg` from the [latest release](https://github.com/dru89/scratchpad/releases/latest), open it, and drag scratchpad to Applications.
-2. Open scratchpad. It adds itself to your login items so the capture hotkey is always ready. You can turn that off with **scratchpad > Open at Login**.
+2. Open scratchpad. It adds itself to your login items so the capture hotkey is always ready. You can turn that off with **scratchpad > Open at Login**. It updates itself when a new version is out.
 3. Press ⌘⇧2 in any app to capture a thought.
 
 To use scratchpad from the terminal, choose **scratchpad > Install Command Line Tool**, which links `scratchpad` into `~/.local/bin`.
@@ -76,6 +78,7 @@ The install script adds scratchpad to your application launcher and starts it in
 | Archive, or move back to the Inbox | ⇧⌘A | Ctrl+Shift+A |
 | Trash, or restore | ⇧⌘⌫ | Ctrl+Shift+Backspace |
 | Open in its own window | ⇧⌘O | Ctrl+Shift+O |
+| Get info | ⌘I | Ctrl+I |
 | Show or hide the sidebar | ⌘\ | Ctrl+\ |
 | Inbox, Archive, Trash | ⌘1, ⌘2, ⌘3 | Ctrl+1, Ctrl+2, Ctrl+3 |
 | Filter the sidebar | ⇧⌘L | Ctrl+Shift+L |
@@ -94,10 +97,11 @@ scratchpad search sync "rich copy"       # every word must match; quote phrases
 scratchpad show 01M3F9ZX7F               # the draft as markdown
 scratchpad edit 01M3F9ZX7F               # in $EDITOR; typing done elsewhere meanwhile is kept
 scratchpad archive 01M3F9ZX7F            # also trash and restore
+scratchpad link 01M3F9ZX7F               # the scratchpad:// link that opens it in the app
 scratchpad capture                       # open the capture window, from Raycast, a script or anything else
 ```
 
-Any unique prefix of a draft's id works, and `--json` gives machine-readable output.
+Any unique prefix of a draft's id works, and `--json` gives machine-readable output, including each draft's link.
 
 For AI agents, `scratchpad mcp` is an MCP server. To add it to Claude Code for every project:
 
@@ -105,11 +109,11 @@ For AI agents, `scratchpad mcp` is an MCP server. To add it to Claude Code for e
 claude mcp add --scope user scratchpad -- ~/.local/bin/scratchpad mcp
 ```
 
-Agents can list, search, read, create, update and append to drafts, and archive, trash or restore them. None of the tools delete anything permanently.
+Agents can list, search, read, create, update and append to drafts, and archive, trash or restore them. None of the tools delete anything permanently. Results include each draft's link, so an agent can hand you one to click.
 
 ## Your data
 
-Drafts live in `~/Library/Application Support/dev.unremarkable.scratchpad/` on macOS and `~/.local/share/scratchpad/` on Linux. There's no sync yet, and nothing leaves your computer. `scratchpad list --all` and `scratchpad show` get any draft back out as plain markdown.
+Drafts live in `~/Library/Application Support/dev.unremarkable.scratchpad/` on macOS and `~/.local/share/scratchpad/` on Linux. There's no sync yet, and your drafts never leave your computer; the Mac app only checks GitHub for new versions. `scratchpad list --all` and `scratchpad show` get any draft back out as plain markdown.
 
 ## Status
 

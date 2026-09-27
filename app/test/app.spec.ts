@@ -227,4 +227,62 @@ test.describe.serial('scratchpad app', () => {
     await expect(table.locator('.cm-searchMatch')).toHaveCount(0);
     await expect(table.locator('td').last()).toHaveText('needs more work');
   });
+
+  test('scratchpad:// links open drafts and the capture window', async () => {
+    const id = run('new', 'Opened from a link').trim();
+    // Linux passes a link to the running app on the command line; macOS sends open-url.
+    await app.evaluate(({ app }, url) => app.emit('second-instance', {}, ['scratchpad-app', url], '/'), `scratchpad://open/${id}`);
+    await expect.poll(() => app.windows().some((w) => w.url().includes(`draft=${id}`))).toBe(true);
+    const own = app.windows().find((w) => w.url().includes(`draft=${id}`))!;
+    await expect.poll(() => editorText(own)).toContain('Opened from a link');
+    await own.close();
+
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('kind=capture'))?.hide();
+    });
+    await app.evaluate(({ app }) => app.emit('open-url', { preventDefault() {} }, 'scratchpad://capture'));
+    await expect.poll(() => isVisible('capture')).toBe(true);
+    await (await windowOf('capture')).keyboard.press('Escape');
+  });
+
+  test('the Draft menu copies, duplicates and shows info for the open draft', async () => {
+    const main = await windowOf('main');
+    await main.locator('#sidebar .item-title', { hasText: 'Hello from the app' }).click();
+    const id = list().find((d) => d.title === 'Hello from the app')!.id;
+    const menu = (item: string) =>
+      app.evaluate(({ BrowserWindow, Menu }, item) => {
+        const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('kind=main'));
+        Menu.getApplicationMenu()!.getMenuItemById(item)!.click(undefined, win);
+      }, item);
+    const clipboard = () => app.evaluate(({ clipboard }) => clipboard.readText());
+
+    await menu('copyLink');
+    await expect.poll(clipboard).toBe(`scratchpad://open/${id}`);
+    await expect(main.locator('#toast')).toHaveText('Copied link');
+    await menu('copyId');
+    await expect.poll(clipboard).toBe(id);
+
+    await menu('info');
+    const info = main.locator('.info-box');
+    await expect(info).toBeVisible();
+    await expect(info.locator('.info-title')).toHaveText('Hello from the app');
+    await expect(info).toContainText(id);
+    await main.keyboard.press('Escape');
+    await expect(info).toBeHidden();
+
+    await menu('duplicate');
+    await expect.poll(() => list().filter((d) => d.title === 'Hello from the app').length).toBe(2);
+    await expect(main.locator('#toast')).toHaveText('Duplicated');
+  });
+
+  test('Empty Trash deletes what is in the Trash, after asking', async () => {
+    const id = run('new', 'Doomed').trim();
+    run('trash', id);
+    await app.evaluate(({ dialog, Menu }) => {
+      dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as typeof dialog.showMessageBox;
+      Menu.getApplicationMenu()!.getMenuItemById('emptyTrash')!.click();
+    });
+    await expect.poll(() => list('--trash').length).toBe(0);
+    expect(list().some((d) => d.title === 'Hello from the app')).toBe(true);
+  });
 });

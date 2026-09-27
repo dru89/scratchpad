@@ -63,7 +63,7 @@ CI ([`.github/workflows/build.yml`](../.github/workflows/build.yml)) runs every 
 | `APPLE_APP_SPECIFIC_PASSWORD` | An app-specific password for that Apple ID |
 | `APPLE_TEAM_ID` | The team the certificate belongs to |
 
-To release, bump `version` in `app/package.json` and push a matching tag (`v0.2.0`). The tag's run publishes the macOS build as a GitHub Release.
+To release, bump `version` in `app/package.json` and push a matching tag (`v0.2.0`). The tag's run publishes the macOS build as a GitHub Release, with `latest-mac.yml`, the update feed that installed copies check every few hours ([`electron/updates.ts`](../app/electron/updates.ts)).
 
 ## Environment variables
 

@@ -36,5 +36,8 @@
     "vite": "^8.3.1",
     "vitest": "^5.0.2"
   },
-  "author": "Drew Hays <drew@hays.fm>"
+  "author": "Drew Hays <drew@hays.fm>",
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
 }

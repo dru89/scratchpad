@@ -8,7 +8,7 @@ use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 use client::Client;
 use scratchpad_core::paths::Paths;
-use scratchpad_core::protocol::{DraftDetail, DraftState, DraftSummary, ListResult, RpcError, codes};
+use scratchpad_core::protocol::{DraftDetail, DraftState, DraftSummary, ListResult, RpcError, codes, draft_link};
 use serde_json::{Value, json};
 use std::io::{IsTerminal, Read};
 
@@ -81,6 +81,8 @@ enum Cmd {
     },
     /// Open a draft in its own app window.
     Open { id: String },
+    /// Print a draft's link, which opens it in the app.
+    Link { id: String },
     /// Serve drafts to agents over MCP on stdio.
     Mcp,
     /// Start, stop, or check the background daemon.
@@ -132,8 +134,20 @@ fn text_arg(words: Vec<String>) -> Result<String> {
     Ok(text)
 }
 
+/// Prints JSON, with each draft's link added as `url`.
 fn print_json(v: &impl serde::Serialize) {
-    println!("{}", serde_json::to_string_pretty(v).unwrap());
+    let mut v = serde_json::to_value(v).unwrap();
+    match &mut v {
+        Value::Array(items) => items.iter_mut().for_each(add_link),
+        v => add_link(v),
+    }
+    println!("{}", serde_json::to_string_pretty(&v).unwrap());
+}
+
+fn add_link(v: &mut Value) {
+    if let Some(url) = v.get("id").and_then(Value::as_str).map(draft_link) {
+        v["url"] = json!(url);
+    }
 }
 
 fn print_summary(json: bool, v: &Value) -> Result<()> {
@@ -252,6 +266,10 @@ async fn run(cli: Cli) -> Result<()> {
                 let d: DraftDetail = c.call("drafts.get", json!({ "id": id })).await?;
                 launch_app(&[format!("--open={}", d.summary.id)])?;
             }
+        }
+        Cmd::Link { id } => {
+            let d: DraftDetail = c.call("drafts.get", json!({ "id": id })).await?;
+            println!("{}", draft_link(&d.summary.id));
         }
         Cmd::Mcp | Cmd::Daemon { .. } => unreachable!(),
     }

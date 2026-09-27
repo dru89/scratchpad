@@ -20,6 +20,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AppClient } from './daemon';
+import { checkNow, restartToUpdate, startUpdates, updateReady, updatesEnabled } from './updates';
 import { StateStore, Windows } from './windows';
 
 const IDLE_MS = Number(process.env.SCRATCHPAD_IDLE_MS) || 15 * 60 * 1000;
@@ -38,10 +39,31 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
+/**
+ * Opens a scratchpad:// link: scratchpad://open/<id> opens that draft in its
+ * own window, and scratchpad://capture summons the capture window. macOS
+ * delivers links through open-url; Linux passes them on the command line.
+ */
+function openLink(windows: Windows, url: string) {
+  let link: URL;
+  try {
+    link = new URL(url);
+  } catch {
+    return;
+  }
+  if (link.protocol !== 'scratchpad:') return;
+  const id = link.pathname.slice(1);
+  if (link.host === 'open' && /^[0-9A-HJKMNP-TV-Z]{26}$/i.test(id)) windows.openDraft(id.toUpperCase());
+  else if (link.host === 'capture') windows.showCapture({ mode: 'summon' });
+}
+
 /** What the command line asks for: see app/bin/scratchpad-app. */
 function summon(windows: Windows, argv: string[]) {
   const value = (flag: string) => argv.find((a) => a.startsWith(`${flag}=`))?.slice(flag.length + 1);
-  if (argv.includes('--capture')) {
+  const links = argv.filter((a) => a.startsWith('scratchpad://'));
+  if (links.length) {
+    for (const link of links) openLink(windows, link);
+  } else if (argv.includes('--capture')) {
     const draftId = value('--draft');
     windows.showCapture({ mode: argv.includes('--new') ? 'new' : draftId ? 'load' : 'summon', draftId });
   } else if (value('--open')) {
@@ -69,7 +91,64 @@ async function installCli() {
   }
 }
 
-function buildMenu(): Menu {
+/** A context menu item from a window: `id` "-" is a separator. */
+interface ContextItem {
+  id: string;
+  label: string;
+  submenu?: ContextItem[];
+}
+
+interface MenuHandlers {
+  emptyTrash(): void;
+  restartToUpdate(): void;
+}
+
+/**
+ * The Draft menu: actions on the focused window's draft, carried out by that
+ * window. On Linux the window handles the keys itself and the menu only shows
+ * them; on macOS the menu has to take them.
+ */
+function draftMenu(): MenuItemConstructorOptions {
+  const item = (label: string, action: string, accelerator?: string): MenuItemConstructorOptions => ({
+    id: action,
+    label,
+    accelerator,
+    registerAccelerator: isMac,
+    click: (_item, win) => {
+      const target = win instanceof BrowserWindow ? win : BrowserWindow.getFocusedWindow();
+      target?.webContents.send('menu:action', action);
+    },
+  });
+  return {
+    label: 'Draft',
+    submenu: [
+      item('New Draft', 'newDraft', 'CmdOrCtrl+N'),
+      { type: 'separator' },
+      item('Pin', 'pin', 'CmdOrCtrl+Shift+P'),
+      item('Float on Top', 'float', 'CmdOrCtrl+Shift+F'),
+      { type: 'separator' },
+      item('Copy as Rich Text', 'copyRich', 'CmdOrCtrl+Shift+C'),
+      {
+        label: 'Copy',
+        submenu: [
+          item('Contents', 'copyContents'),
+          item('Title', 'copyTitle'),
+          item('Link', 'copyLink'),
+          item('ID', 'copyId'),
+        ],
+      },
+      { type: 'separator' },
+      item('Duplicate', 'duplicate'),
+      item('Get Info', 'info', 'CmdOrCtrl+I'),
+      item('Open in New Window', 'openWindow', 'CmdOrCtrl+Shift+O'),
+      { type: 'separator' },
+      item('Archive', 'archive', 'CmdOrCtrl+Shift+A'),
+      item('Move to Trash', 'trash', 'CmdOrCtrl+Shift+Backspace'),
+    ],
+  };
+}
+
+function buildMenu(handlers: MenuHandlers): Menu {
   // No undo/redo roles in Edit: native undo would bypass the editor's own,
   // which only reverts this window's edits.
   const edit: MenuItemConstructorOptions = {
@@ -80,14 +159,26 @@ function buildMenu(): Menu {
     label: 'View',
     submenu: [{ role: 'toggleDevTools' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }],
   };
+  const emptyTrash: MenuItemConstructorOptions = { id: 'emptyTrash', label: 'Empty Trash…', click: handlers.emptyTrash };
   if (!isMac) {
-    return Menu.buildFromTemplate([{ label: 'File', submenu: [{ role: 'close' }, { role: 'quit' }] }, edit, view]);
+    return Menu.buildFromTemplate([
+      { label: 'File', submenu: [emptyTrash, { type: 'separator' }, { role: 'close' }, { role: 'quit' }] },
+      edit,
+      draftMenu(),
+      view,
+    ]);
   }
+  const updates: MenuItemConstructorOptions[] = !updatesEnabled()
+    ? []
+    : updateReady()
+      ? [{ label: 'Restart to Update', click: handlers.restartToUpdate }]
+      : [{ label: 'Check for Updates…', click: () => void checkNow() }];
   return Menu.buildFromTemplate([
     {
       label: app.name,
       submenu: [
         { role: 'about' },
+        ...updates,
         { type: 'separator' },
         {
           label: 'Open at Login',
@@ -106,8 +197,9 @@ function buildMenu(): Menu {
         { role: 'quit' },
       ],
     },
-    { label: 'File', submenu: [{ role: 'close' }] },
+    { label: 'File', submenu: [emptyTrash, { type: 'separator' }, { role: 'close' }] },
     edit,
+    draftMenu(),
     view,
     { role: 'windowMenu' },
   ]);
@@ -119,6 +211,39 @@ if (!app.requestSingleInstanceLock()) {
   let windows: Windows;
   let daemon: AppClient;
   let state: StateStore | undefined;
+  // Links that arrive before the app is ready, as when one launches it.
+  const pendingLinks: string[] = [];
+
+  app.on('open-url', (e, url) => {
+    e.preventDefault();
+    if (windows) openLink(windows, url);
+    else pendingLinks.push(url);
+  });
+
+  /** Empty Trash…, from the File menu and the Trash tab: confirms, then deletes. */
+  async function emptyTrash(parent?: BrowserWindow | null) {
+    const { drafts } = await daemon.call<{ drafts: unknown[] }>('drafts.list', { states: ['trashed'], limit: 100_000 });
+    if (!drafts.length) return;
+    const n = drafts.length;
+    const options: Electron.MessageBoxOptions = {
+      type: 'warning',
+      message: `Permanently delete ${n === 1 ? 'the draft' : `the ${n} drafts`} in the Trash?`,
+      detail: "You can't undo this.",
+      buttons: ['Empty Trash', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+    };
+    const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+    if (response === 0) await daemon.call('drafts.emptyTrash');
+  }
+
+  const menuHandlers: MenuHandlers = {
+    emptyTrash: () => void emptyTrash(BrowserWindow.getFocusedWindow()).catch((e) => console.error('scratchpad:', e)),
+    restartToUpdate: () =>
+      restartToUpdate(() => {
+        if (windows) windows.quitting = true;
+      }),
+  };
 
   app.on('second-instance', (_e, argv) => {
     // Autostart while already running: nothing to do. A plain second launch
@@ -149,9 +274,11 @@ if (!app.requestSingleInstanceLock()) {
     state = new StateStore();
     windows = new Windows(state);
     windows.createCapture();
-    // Opened at login on macOS counts as --background: ready for the hotkey, nothing shown.
+    // Opened at login on macOS counts as --background: ready for the hotkey,
+    // nothing shown. So does being opened by a link, which opens its own window.
     const atLogin = isMac && app.getLoginItemSettings().wasOpenedAtLogin;
-    summon(windows, atLogin ? [...process.argv, '--background'] : process.argv);
+    summon(windows, atLogin || pendingLinks.length ? [...process.argv, '--background'] : process.argv);
+    for (const link of pendingLinks.splice(0)) openLink(windows, link);
 
     if (isMac) {
       if (!globalShortcut.register(CAPTURE_HOTKEY, () => windows.showCapture({ mode: 'summon' }))) {
@@ -170,7 +297,8 @@ if (!app.requestSingleInstanceLock()) {
     daemon.on('ui.capture', (p) => windows.showCapture(p ?? {}));
     daemon.on('ui.open', (p) => p?.id && windows.openDraft(p.id));
 
-    Menu.setApplicationMenu(buildMenu());
+    Menu.setApplicationMenu(buildMenu(menuHandlers));
+    startUpdates(() => Menu.setApplicationMenu(buildMenu(menuHandlers)));
 
     const managed = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => {
       const m = windows.managed(e.sender.id);
@@ -195,13 +323,17 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('app:openDraft', (_e, id: string) => windows.openDraft(id));
     ipcMain.handle('app:openInCapture', (_e, id: string) => windows.showCapture({ mode: 'load', draftId: id }));
     ipcMain.handle('app:showMain', () => windows.showMain());
-    ipcMain.handle('app:contextMenu', (e, items: { id: string; label: string }[]) => {
+    ipcMain.handle('app:contextMenu', (e, items: ContextItem[]) => {
       return new Promise<string | null>((resolve) => {
-        const menu = Menu.buildFromTemplate(
-          items.map((item) =>
-            item.id === '-' ? { type: 'separator' as const } : { label: item.label, click: () => resolve(item.id) },
-          ),
-        );
+        const template = (list: ContextItem[]): MenuItemConstructorOptions[] =>
+          list.map((item) =>
+            item.id === '-'
+              ? { type: 'separator' }
+              : item.submenu
+                ? { label: item.label, submenu: template(item.submenu) }
+                : { label: item.label, click: () => resolve(item.id) },
+          );
+        const menu = Menu.buildFromTemplate(template(items));
         // The close callback can fire before the click; let the click win.
         menu.popup({
           window: BrowserWindow.fromWebContents(e.sender) ?? undefined,
@@ -213,6 +345,8 @@ if (!app.requestSingleInstanceLock()) {
       const { html } = await daemon.call<{ html: string }>('drafts.render', { text: markdown });
       await clipboard.write([new ClipboardItem({ 'text/html': html, 'text/plain': markdown })]);
     });
+    ipcMain.handle('clipboard:copyText', (_e, text: string) => clipboard.writeText(text));
+    ipcMain.handle('app:emptyTrash', (e) => emptyTrash(BrowserWindow.fromWebContents(e.sender)));
     ipcMain.handle('app:quit', () => app.quit());
   });
 

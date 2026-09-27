@@ -1131,6 +1131,60 @@ input[type='search']::-webkit-search-cancel-button {
   margin-left: -3px;
 }
 
+/* ---- get info ------------------------------------------------------------- */
+
+.info-box {
+  width: min(460px, calc(100% - 32px));
+  outline: none;
+}
+
+.info-title {
+  margin: 0;
+  padding: 14px 16px 10px;
+  color: var(--ink);
+  font: 600 14px/20px var(--font-ui);
+  overflow-wrap: anywhere;
+}
+
+.info-rows {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0 16px 14px;
+  font-size: 12.5px;
+  line-height: 22px;
+}
+
+.info-rows dt {
+  color: var(--ink-3);
+}
+
+.info-rows dd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+}
+
+.info-rows code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  font: 12px/22px var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.info-rows .btn {
+  height: 22px;
+  margin-left: auto;
+  padding: 0 8px;
+  font-size: 11.5px;
+}
+
 /* ---- toast ---------------------------------------------------------------- */
 
 .toast {

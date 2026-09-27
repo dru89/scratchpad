@@ -20,7 +20,10 @@ contextBridge.exposeInMainWorld('scratchpad', {
   openDraft: (id: string) => ipcRenderer.invoke('app:openDraft', id),
   openInCapture: (id: string) => ipcRenderer.invoke('app:openInCapture', id),
   showMain: () => ipcRenderer.invoke('app:showMain'),
-  contextMenu: (items: { id: string; label: string }[]) => ipcRenderer.invoke('app:contextMenu', items),
+  contextMenu: (items: object[]) => ipcRenderer.invoke('app:contextMenu', items),
+  onMenuAction: (cb: (action: string) => void) => ipcRenderer.on('menu:action', (_e, action) => cb(action)),
   copyRich: (markdown: string) => ipcRenderer.invoke('clipboard:copyRich', markdown),
+  copyText: (text: string) => ipcRenderer.invoke('clipboard:copyText', text),
+  emptyTrash: () => ipcRenderer.invoke('app:emptyTrash'),
   quit: () => ipcRenderer.invoke('app:quit'),
 });

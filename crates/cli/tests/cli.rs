@@ -67,6 +67,10 @@ fn the_draft_lifecycle_from_the_command_line() {
 
     env.ok(&["append", &id, "\n\n- milk\n- eggs"]);
     assert_eq!(env.ok(&["show", &id[..14]]), "# Groceries\n\n- milk\n- eggs\n");
+    assert_eq!(env.ok(&["link", &id[..14]]).trim(), format!("scratchpad://open/{id}"));
+    let listed: Value = serde_json::from_str(&env.ok(&["--json", "list"])).unwrap();
+    let groceries = listed.as_array().unwrap().iter().find(|d| d["id"] == id.as_str()).unwrap();
+    assert_eq!(groceries["url"], format!("scratchpad://open/{id}"));
 
     let hits = env.ok(&["search", "eggs"]);
     assert!(hits.contains("Groceries") && hits.contains("eggs"), "{hits}");

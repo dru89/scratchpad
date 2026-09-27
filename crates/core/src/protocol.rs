@@ -37,6 +37,11 @@ impl DraftState {
 /// What lists show for a draft whose body has no text yet.
 pub const EMPTY_TITLE: &str = "New draft";
 
+/// The link that opens a draft in the app, in its own window.
+pub fn draft_link(id: &str) -> String {
+    format!("scratchpad://open/{id}")
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftSummary {

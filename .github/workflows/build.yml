@@ -120,13 +120,15 @@ jobs:
           fi
           npm run package
 
-      - name: Check the signature
+      - name: Check the signature and update feed
         if: github.event_name != 'pull_request'
-        working-directory: app/release/mac-arm64
+        working-directory: app/release
         run: |
-          codesign --verify --deep --strict --verbose=2 scratchpad.app
-          codesign --verify --strict --verbose=2 scratchpad.app/Contents/Resources/bin/scratchpadd
-          spctl --assess --type execute --verbose=4 scratchpad.app
+          codesign --verify --deep --strict --verbose=2 mac-arm64/scratchpad.app
+          codesign --verify --strict --verbose=2 mac-arm64/scratchpad.app/Contents/Resources/bin/scratchpadd
+          spctl --assess --type execute --verbose=4 mac-arm64/scratchpad.app
+          test -f mac-arm64/scratchpad.app/Contents/Resources/app-update.yml
+          test -f latest-mac.yml
 
       # The end-to-end suite, run against the build that ships.
       - name: Test the packaged app
@@ -142,9 +144,12 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: scratchpad-mac
+          # latest-mac.yml and the blockmaps are the update feed the app reads.
           path: |
             app/release/*.dmg
             app/release/*.zip
+            app/release/*.blockmap
+            app/release/latest-mac.yml
           if-no-files-found: error
 
   release:
