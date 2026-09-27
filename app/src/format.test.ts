@@ -64,7 +64,7 @@ describe('kbd', () => {
     expect(caps(kbd('Mod+Shift+P', true))).toBe('⇧ ⌘ P');
     expect(caps(kbd('Mod+Alt+F', true))).toBe('⌥ ⌘ F');
     expect(caps(kbd('Mod+Shift+P', false))).toBe('Ctrl Shift P');
-    expect(kbd('Shift+Backspace')).toBe('<kbd class="kbd">Shift</kbd><kbd class="kbd">⌫</kbd>');
+    expect(kbd('Shift+Backspace', false)).toBe('<kbd class="kbd">Shift</kbd><kbd class="kbd">⌫</kbd>');
   });
 });
 

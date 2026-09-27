@@ -34,7 +34,7 @@ Every text color meets 4.5:1 on every surface it's used on, in both themes, incl
 
 ## Type
 
-Two faces. The chrome uses the system face (Noto Sans on Plasma, SF on macOS) so it feels native. The editor uses **Atkinson Hyperlegible Next**, with **Atkinson Hyperlegible Mono** for code, both bundled under `app/src/fonts` (OFL, licenses alongside). It was drawn to tell similar shapes apart (Il1, 0O, rn/m), which suits text full of names, times and codes that gets read at a glance. Its slashed zero and the tail on the q are features, not accidents.
+Two faces. The chrome uses the system face (Noto Sans on Plasma, SF on macOS) so it feels native. The editor uses **Atkinson Hyperlegible Next**, with **Commit Mono** for code, both bundled under `app/src/fonts` (OFL, licenses alongside). Atkinson was drawn to tell similar shapes apart (Il1, 0O, rn/m), which suits text full of names, times and codes that gets read at a glance. Its slashed zero and the tail on the q are features, not accidents. Code is set in Commit Mono because it's the least opinionated of the monospaced faces we tried: compact, even and quiet, where Atkinson Hyperlegible Mono felt wide and loosely spaced next to the prose.
 
 Editor sizes are in em of `--editor-size` (16px, or 15px in the capture window), so the whole column scales from one variable. Body text is 1.6 line height. Headings are 1.5em, 1.25em and 1.1em, then body size for h4 to h6, told apart by weight, color and case. Headings are semibold (600), a step lighter than bold text in a paragraph (700), so they lead without shouting. Three real heading sizes are enough for a scratchpad.
 
