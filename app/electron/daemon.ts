@@ -4,11 +4,13 @@
 // receives capture and open commands. Whoever finds nothing listening starts
 // the daemon; its lock file settles any race.
 
+import { app } from 'electron';
 import { spawn } from 'node:child_process';
 import { mkdirSync, openSync } from 'node:fs';
 import { createConnection, type Socket } from 'node:net';
 import { join } from 'node:path';
 import { daemonBinary, dataDir, socketPath } from './paths';
+import { isOlder } from './version';
 
 let lastSpawn = 0;
 
@@ -89,17 +91,20 @@ export class AppClient {
   private nextId = 1;
   private pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
   private handlers = new Map<string, Handler>();
+  private replacedOld = false;
 
   constructor() {
     this.link = new DaemonLink({
       onLine: (line) => this.receive(line),
       onStatus: (connected) => {
         if (connected) {
-          this.call('hello', {
+          this.call<{ version: string }>('hello', {
             protocol: 1,
-            client: { kind: 'app', version: '0.1.0' },
+            client: { kind: 'app', version: app.getVersion() },
             capabilities: ['ui'],
-          }).catch((e) => console.error('scratchpad: hello failed', e));
+          })
+            .then((hello) => this.replaceIfOlder(hello.version))
+            .catch((e) => console.error('scratchpad: hello failed', e));
         } else {
           for (const p of this.pending.values()) p.reject(new Error('disconnected from scratchpadd'));
           this.pending.clear();
@@ -110,6 +115,19 @@ export class AppClient {
 
   on(method: string, handler: Handler) {
     this.handlers.set(method, handler);
+  }
+
+  /**
+   * A daemon older than the app is one an update left running (it outlives
+   * the app). Ask it to exit; the connections start this version's daemon
+   * when they reconnect. Only once per run, so an older daemon that comes
+   * back (an old copy on the PATH, say) can't start a loop.
+   */
+  private replaceIfOlder(version: string) {
+    if (this.replacedOld || !isOlder(version, app.getVersion())) return;
+    this.replacedOld = true;
+    console.log(`scratchpad: replacing scratchpadd ${version} with ${app.getVersion()}`);
+    this.call('daemon.shutdown').catch(() => {});
   }
 
   call<T = any>(method: string, params: object = {}): Promise<T> {

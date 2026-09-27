@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the scratchpad app from this checkout (build it first: cd app && npm run build).
 #
-#   scratchpad-app [--background] [--capture [--new | --draft=<id>]] [--open=<id>]
+#   scratchpad-app [--background] [--capture [--new | --draft=<id>]] [--open=<id>] [--quit]
 here=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
 if [ "$(uname)" = Darwin ]; then
   exec "$here/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron" "$here" "$@"

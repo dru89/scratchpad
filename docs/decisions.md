@@ -32,7 +32,7 @@ Newest first. Each entry says what was decided, why, and what would make us revi
 
 **Costs accepted:**
 - Lifecycle: the app spawns the daemon when it can't connect; systemd and launchd socket activation can come later.
-- A version handshake on every connection, with the app restarting an outdated daemon.
+- A version handshake on every connection, with the app restarting an outdated daemon. (2026-09-27: built, along with the daemon exiting when its binary is replaced, after the Mac updates showed an old daemon outliving the app. See [design.md](design.md#processes).)
 - Reconnect and keystroke buffering in the app.
 - A second binary to bundle and sign.
 - A long-running process holding decrypted keys.

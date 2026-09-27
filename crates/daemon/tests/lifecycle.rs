@@ -24,7 +24,11 @@ impl Env {
     }
 
     fn start(&self) -> Child {
-        Command::new(env!("CARGO_BIN_EXE_scratchpadd"))
+        self.start_binary(Path::new(env!("CARGO_BIN_EXE_scratchpadd")))
+    }
+
+    fn start_binary(&self, binary: &Path) -> Child {
+        Command::new(binary)
             .env("SCRATCHPAD_DATA_DIR", &self.data)
             .env("SCRATCHPAD_SOCKET", &self.socket)
             .stdout(Stdio::null())
@@ -114,4 +118,32 @@ async fn sigterm_stops_cleanly() {
     Command::new("kill").arg(daemon.id().to_string()).status().unwrap();
     assert!(daemon.wait().unwrap().success());
     assert!(!env.socket.exists());
+}
+
+#[tokio::test]
+async fn exits_when_an_update_replaces_its_binary() {
+    let env = Env::new();
+    // A copy of the binary, so the test can replace it the way an install does.
+    let binary = env.data.parent().unwrap().join("bin/scratchpadd");
+    std::fs::create_dir_all(binary.parent().unwrap()).unwrap();
+    std::fs::copy(env!("CARGO_BIN_EXE_scratchpadd"), &binary).unwrap();
+    let mut child = env.start_binary(&binary);
+    let mut stream = wait_for(&env.socket).await;
+    assert_eq!(call(&mut stream, "daemon.status", json!({})).await["result"]["pid"], child.id());
+
+    // Installers write the new binary beside the old one and rename it over.
+    tokio::time::sleep(Duration::from_millis(1100)).await; // a new modification time on coarse filesystems
+    let fresh = binary.with_file_name("scratchpadd.new");
+    std::fs::copy(env!("CARGO_BIN_EXE_scratchpadd"), &fresh).unwrap();
+    std::fs::rename(&fresh, &binary).unwrap();
+
+    for _ in 0..100 {
+        if let Some(status) = child.try_wait().unwrap() {
+            assert!(status.success(), "it should exit cleanly: {status}");
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let _ = child.kill();
+    panic!("the daemon kept running after its binary was replaced");
 }

@@ -22,8 +22,33 @@ pub struct Client {
 }
 
 impl Client {
-    /// Connects, starting the daemon first if it isn't running.
+    /// Connects, starting the daemon first if it isn't running. A daemon
+    /// older than this client is one an update left running: it's asked to
+    /// exit, and this client's own daemon takes over.
     pub async fn connect(paths: &Paths, kind: &str) -> Result<Client> {
+        let (mut client, hello) = Self::open(paths, kind).await?;
+        if !is_older(&hello.version, env!("CARGO_PKG_VERSION")) {
+            return client.checked(&hello);
+        }
+        let _ = client.call::<Value>("daemon.shutdown", json!({})).await;
+        drop(client);
+        wait_for_exit(paths).await?;
+        let (client, hello) = Self::open(paths, kind).await?;
+        client.checked(&hello)
+    }
+
+    /// Connects only if the daemon is already running, whatever its version.
+    pub async fn connect_existing(paths: &Paths, kind: &str) -> Result<Option<Client>> {
+        match UnixStream::connect(&paths.socket).await {
+            Ok(stream) => {
+                let (client, hello) = Self::handshake(stream, kind).await?;
+                Ok(Some(client.checked(&hello)?))
+            }
+            Err(_) => Ok(None),
+        }
+    }
+
+    async fn open(paths: &Paths, kind: &str) -> Result<(Client, proto::HelloResult)> {
         let stream = match UnixStream::connect(&paths.socket).await {
             Ok(stream) => stream,
             Err(_) => {
@@ -34,15 +59,22 @@ impl Client {
         Self::handshake(stream, kind).await
     }
 
-    /// Connects only if the daemon is already running.
-    pub async fn connect_existing(paths: &Paths, kind: &str) -> Result<Option<Client>> {
-        match UnixStream::connect(&paths.socket).await {
-            Ok(stream) => Ok(Some(Self::handshake(stream, kind).await?)),
-            Err(_) => Ok(None),
+    /// Refuses a daemon that speaks a different protocol: a newer one, since
+    /// an older one was replaced.
+    fn checked(self, hello: &proto::HelloResult) -> Result<Client> {
+        if hello.protocol != proto::PROTOCOL_VERSION {
+            bail!(
+                "scratchpadd {} speaks protocol {}, but this scratchpad {} speaks {}; update scratchpad",
+                hello.version,
+                hello.protocol,
+                env!("CARGO_PKG_VERSION"),
+                proto::PROTOCOL_VERSION
+            );
         }
+        Ok(self)
     }
 
-    async fn handshake(stream: UnixStream, kind: &str) -> Result<Client> {
+    async fn handshake(stream: UnixStream, kind: &str) -> Result<(Client, proto::HelloResult)> {
         let (reader, writer) = stream.into_split();
         let mut client = Client { reader: BufReader::new(reader).lines(), writer, next_id: 0 };
         let hello: proto::HelloResult = client
@@ -54,15 +86,7 @@ impl Client {
                 }),
             )
             .await?;
-        if hello.protocol != proto::PROTOCOL_VERSION {
-            bail!(
-                "scratchpadd {} speaks protocol {}, but this scratchpad speaks {}; run `scratchpad daemon stop` and try again",
-                hello.version,
-                hello.protocol,
-                proto::PROTOCOL_VERSION
-            );
-        }
-        Ok(client)
+        Ok((client, hello))
     }
 
     /// Sends a request and waits for its reply, skipping notifications.
@@ -117,6 +141,37 @@ fn spawn_daemon(paths: &Paths) -> Result<()> {
         .spawn()
         .with_context(|| format!("starting {}", binary.display()))?;
     Ok(())
+}
+
+/// Waits for a daemon that was asked to exit to stop listening.
+async fn wait_for_exit(paths: &Paths) -> Result<()> {
+    for _ in 0..100 {
+        if UnixStream::connect(&paths.socket).await.is_err() {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(30)).await;
+    }
+    bail!("the old scratchpadd didn't exit; see {}", paths.log().display())
+}
+
+/// Whether version `a` is older than `b`, by their numeric parts: 0.1.9 is
+/// older than 0.1.10.
+pub fn is_older(a: &str, b: &str) -> bool {
+    let parts = |v: &str| v.split(['.', '-', '+']).take(3).map(|p| p.parse::<u64>().unwrap_or(0)).collect::<Vec<_>>();
+    parts(a) < parts(b)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_older;
+
+    #[test]
+    fn versions_compare_by_number() {
+        assert!(is_older("0.1.9", "0.1.10"));
+        assert!(is_older("0.1.2", "1.0.0"));
+        assert!(!is_older("0.1.2", "0.1.2"));
+        assert!(!is_older("0.2.0", "0.1.9"));
+    }
 }
 
 async fn wait_for_daemon(paths: &Paths) -> Result<UnixStream> {

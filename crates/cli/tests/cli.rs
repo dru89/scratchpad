@@ -293,3 +293,38 @@ fn mcp_tools_work_end_to_end() {
     assert_eq!(missing["isError"], true);
     assert!(missing["content"][0]["text"].as_str().unwrap().contains("no draft matches"));
 }
+
+#[test]
+fn a_daemon_older_than_the_cli_is_replaced() {
+    use std::os::unix::net::UnixListener;
+    let env = Env::new();
+    let socket = env.dir.path().join("run/daemon.sock");
+    std::fs::create_dir_all(socket.parent().unwrap()).unwrap();
+    let listener = UnixListener::bind(&socket).unwrap();
+    // A daemon an update left running: it answers hello and exits when asked.
+    let old = std::thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut writer = stream;
+        let mut methods = Vec::new();
+        let mut line = String::new();
+        while reader.read_line(&mut line).unwrap() > 0 {
+            let msg: Value = serde_json::from_str(&line).unwrap();
+            let method = msg["method"].as_str().unwrap().to_string();
+            let result =
+                if method == "hello" { json!({ "protocol": 1, "version": "0.0.1", "pid": 1 }) } else { json!({}) };
+            writeln!(writer, "{}", json!({ "jsonrpc": "2.0", "id": msg["id"], "result": result })).unwrap();
+            line.clear();
+            methods.push(method);
+            if methods.last().unwrap() == "daemon.shutdown" {
+                break;
+            }
+        }
+        methods
+    });
+
+    env.ok(&["list"]);
+    assert_eq!(old.join().unwrap(), ["hello", "daemon.shutdown"]);
+    let status: Value = serde_json::from_str(&env.ok(&["--json", "daemon", "status"])).unwrap();
+    assert_eq!(status["version"], env!("CARGO_PKG_VERSION"), "the CLI's own daemon took over");
+}

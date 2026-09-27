@@ -66,8 +66,8 @@ test.describe.serial('scratchpad app', () => {
   });
 
   test.afterAll(async () => {
-    // Quit the way the menu does. Closing windows only hides the main and
-    // capture windows, by design.
+    // Closing windows only hides the main and capture windows, by design,
+    // so quit outright.
     if (app) {
       const proc = app.process();
       const exited = new Promise<boolean>((resolve) => {
@@ -75,7 +75,8 @@ test.describe.serial('scratchpad app', () => {
         proc.once('exit', () => resolve(true));
         setTimeout(() => resolve(false), 10_000);
       });
-      await app.evaluate(({ app }) => app.quit()).catch(() => {});
+      // The way app/scripts/update-linux.sh asks: a second launch with --quit.
+      await app.evaluate(({ app }) => app.emit('second-instance', {}, ['scratchpad-app', '--quit'], '/')).catch(() => {});
       expect(await exited, 'the app should exit when asked to quit').toBe(true);
     }
     try {

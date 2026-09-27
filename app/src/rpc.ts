@@ -20,7 +20,7 @@ export class Rpc {
     bridge().daemon.onStatus(({ connected }) => {
       this.connected = connected;
       if (connected) {
-        this.request('hello', { protocol: 1, client: { kind: 'window', version: '0.1.0' } })
+        this.request('hello', { protocol: 1, client: { kind: 'window', version: __APP_VERSION__ } })
           .then(() => {
             this.ready = true;
             this.connectListeners.forEach((f) => f());

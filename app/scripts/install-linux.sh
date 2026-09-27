@@ -14,6 +14,7 @@
 #   install-linux.sh [--no-autostart] [--uninstall]
 #
 # Re-run it after moving the checkout. Build the app first: npm run build.
+# To update later, run update-linux.sh.
 
 set -euo pipefail
 

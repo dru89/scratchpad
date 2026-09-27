@@ -207,6 +207,9 @@ function buildMenu(handlers: MenuHandlers): Menu {
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
+} else if (process.argv.includes('--quit')) {
+  // --quit asks a running app to quit (below); with none running, there's nothing to do.
+  app.quit();
 } else {
   let windows: Windows;
   let daemon: AppClient;
@@ -246,6 +249,8 @@ if (!app.requestSingleInstanceLock()) {
   };
 
   app.on('second-instance', (_e, argv) => {
+    // --quit, from app/scripts/update-linux.sh: quit as the menu would.
+    if (argv.includes('--quit')) return app.quit();
     // Autostart while already running: nothing to do. A plain second launch
     // (the app icon) shows the main window.
     if (!argv.includes('--background')) summon(windows, argv);

@@ -2,13 +2,16 @@
 //! state changes go through the single daemon task.
 
 use crate::daemon::{ClientId, Daemon};
-use std::time::Duration;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
 
 const TICK: Duration = Duration::from_millis(200);
 const PURGE_EVERY: Duration = Duration::from_secs(60 * 60);
+/// How often the daemon checks whether an update has replaced its binary.
+const BINARY_CHECK: Duration = Duration::from_secs(2);
 
 enum Msg {
     Connected(ClientId, mpsc::UnboundedSender<String>),
@@ -53,6 +56,24 @@ pub async fn run(listener: UnixListener, mut daemon: Daemon) -> anyhow::Result<(
         }
     });
 
+    // When an update replaces this binary on disk (cargo install, a new app
+    // bundle), exit, so the next client starts the new one. Clients
+    // reconnect by themselves, and the app's windows catch up by version.
+    if let Some((exe, started)) = own_binary() {
+        let watch_tx = tx.clone();
+        tokio::spawn(async move {
+            let mut every = tokio::time::interval(BINARY_CHECK);
+            loop {
+                every.tick().await;
+                if stamp(&exe).is_some_and(|now| now != started) {
+                    eprintln!("scratchpadd: {} was replaced; exiting so the new one takes over", exe.display());
+                    let _ = watch_tx.send(Msg::Shutdown);
+                    break;
+                }
+            }
+        });
+    }
+
     let signal_tx = tx.clone();
     tokio::spawn(async move {
         use tokio::signal::unix::{SignalKind, signal};
@@ -84,6 +105,25 @@ pub async fn run(listener: UnixListener, mut daemon: Daemon) -> anyhow::Result<(
     drop(daemon);
     tokio::time::sleep(Duration::from_millis(100)).await;
     Ok(())
+}
+
+/// Enough of a file's metadata to tell that it was replaced.
+#[derive(PartialEq)]
+struct Stamp {
+    len: u64,
+    modified: SystemTime,
+}
+
+fn stamp(path: &Path) -> Option<Stamp> {
+    let meta = std::fs::metadata(path).ok()?;
+    Some(Stamp { len: meta.len(), modified: meta.modified().ok()? })
+}
+
+/// This process's binary, and how it looked when the daemon started.
+fn own_binary() -> Option<(PathBuf, Stamp)> {
+    let exe = std::fs::canonicalize(std::env::current_exe().ok()?).ok()?;
+    let started = stamp(&exe)?;
+    Some((exe, started))
 }
 
 async fn serve(stream: UnixStream, id: ClientId, tx: mpsc::UnboundedSender<Msg>) {

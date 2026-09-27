@@ -66,6 +66,8 @@ scripts/install-linux.sh
 
 The install script adds scratchpad to your application launcher and starts it in the background when you log in (pass `--no-autostart` to skip that). On KDE it also sets Meta+Shift+2 to open the capture window; confirm that once in System Settings > Keyboard > Shortcuts. On other desktops, bind a shortcut to `scratchpad capture`. `scripts/install-linux.sh --uninstall` removes it all.
 
+To update, run `scripts/update-linux.sh` from `app/`. It pulls, reinstalls the daemon and CLI, rebuilds the app and restarts it in the background.
+
 ## Keyboard shortcuts
 
 | action | macOS | Linux |

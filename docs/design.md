@@ -56,7 +56,10 @@ The document has two parts:
 
 **Lifecycle.**
 - A client that can't connect spawns the daemon. An `flock` on a lock file stops two clients from starting two daemons.
-- Every connection opens with a version handshake. When the app finds a daemon older than the one it bundles, it asks that daemon to exit and starts its own.
+- The daemon outlives the app, so an update can leave an old one running. Two things replace it:
+  - The daemon checks its own binary every two seconds and exits cleanly once an install has replaced it (`cargo install`, a new app bundle). Clients reconnect and start the new one, and the app's windows catch up by version.
+  - Every connection opens with a `hello` that carries the client's version. A client that finds an older daemon asks it to exit and starts its own: the one bundled with the app, or the one beside the CLI. It does this once per run, and it never replaces a newer daemon, so an old CLI left on the PATH can't downgrade the app's. A newer daemon is refused only if its protocol changed.
+- The Rust workspace and the app share one version, set by `scripts/bump-version.sh` and checked in CI.
 - systemd and launchd socket activation can come later.
 
 **Locations.**

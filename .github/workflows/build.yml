@@ -28,6 +28,7 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
+      - run: scripts/check-versions.sh
       - run: cargo test --workspace --locked
       - run: cargo build --workspace --locked
 
