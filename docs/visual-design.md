@@ -40,7 +40,7 @@ Editor sizes are in em of `--editor-size` (16px, or 15px in the capture window),
 
 ## The editor
 
-The markdown text is the only source of truth. The editor decorates it; it never changes it. Syntax is hidden except in the element the cursor is in, and that's where it comes back, in `--ink-3`. Widgets are display-only: the bullet dot, the rule and the task box replace syntax visually and don't toggle anything.
+The markdown text is the only source of truth. The editor decorates it and keeps no state of its own. Syntax is hidden except in the element the cursor is in, and that's where it comes back, in `--ink-3`. The bullet dot and the rule only replace syntax visually. The task box does too, and clicking it checks or unchecks the item by editing its `[ ]` or `[x]` in the text, the same edit typing would make.
 
 Rhythm is where most of the calm comes from:
 
@@ -59,7 +59,7 @@ Line classes come from [`editor/livepreview.ts`](../app/src/editor/livepreview.t
 | class | from |
 | --- | --- |
 | `.cm-h1`–`.cm-h6`, `.cm-blank`, `.cm-quote` (+ `-first`, `-last`), `.cm-codeblock` (+ `-first`, `-last`), `.cm-list-2`–`4`, `.cm-task-done` | line decorations in livepreview.ts |
-| `.cm-bullet`, `.cm-rule`, `.cm-task` (+ `.is-done`) | display-only widgets in livepreview.ts |
+| `.cm-bullet`, `.cm-rule`, `.cm-task` (+ `.is-done`) | widgets in livepreview.ts; the task box is a clickable checkbox |
 | `.cm-link-text` | the rendered text of a link, livepreview.ts |
 | `.cm-strong`, `.cm-em`, `.cm-strike`, `.cm-inline-code`, `.cm-link`, `.cm-url`, `.cm-mark` | HighlightStyle in setup.ts |
 | `.cm-code-keyword`, `-string`, `-number`, `-type`, `-comment`, `-function`, `-quiet` | HighlightStyle in setup.ts, for code in fenced blocks |
@@ -107,7 +107,7 @@ Overlays only. The switcher fades in over 120ms and its box drops in from 6px ab
 
 - Use the tokens. A raw color, size or radius in a component is a bug; if nothing fits, add a token with a usage note and check its contrast in both themes.
 - Anything with on and off is a `.tool` with `aria-pressed`, and its icon marks an `.i-fill` part.
-- A new markdown style is a class from livepreview.ts or the HighlightStyle, styled in style.css. Keep the syntax visible on the line being edited, and don't add widgets that change the text.
+- A new markdown style is a class from livepreview.ts or the HighlightStyle, styled in style.css. Keep the syntax visible on the line being edited. A widget never holds state of its own; if clicking it changes something, it does so by editing the markdown.
 - Check the capture window at 320×200 and both themes. `npm run screenshots` captures every window and state; point `SCRATCHPAD_SCREENSHOTS` somewhere else to keep the handoff set in `docs/design-handoff` as it is.
 
 ## Room left for later

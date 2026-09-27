@@ -287,6 +287,19 @@ test.describe.serial('scratchpad app', () => {
     await expect.poll(() => run('show', id)).toBe('Packing\n\n- bag\n- laptop\n');
   });
 
+  test('clicking a task box checks and unchecks it', async () => {
+    const main = await windowOf('main');
+    const id = run('new', 'Errands\n\n- [ ] milk\n- [ ] stamps').trim();
+    await main.locator('#sidebar .item-title', { hasText: 'Errands' }).click();
+    const boxes = main.locator('.cm-task');
+    await expect(boxes).toHaveCount(2);
+    await boxes.first().click();
+    await expect.poll(() => run('show', id)).toBe('Errands\n\n- [x] milk\n- [ ] stamps\n');
+    await expect(boxes.first()).toHaveAttribute('aria-checked', 'true');
+    await boxes.first().click();
+    await expect.poll(() => run('show', id)).toBe('Errands\n\n- [ ] milk\n- [ ] stamps\n');
+  });
+
   test('toolbar buttons explain themselves on hover', async () => {
     const main = await windowOf('main');
     await main.locator('.toolbar .tool[data-action="pin"]').hover();

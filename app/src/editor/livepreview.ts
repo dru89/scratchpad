@@ -49,11 +49,23 @@ class TaskWidget extends WidgetType {
   eq(other: TaskWidget) {
     return other.done === this.done;
   }
-  toDOM() {
+  /** Clicking the box checks or unchecks it by editing its [ ] or [x], as typing would. */
+  toDOM(view: EditorView) {
     const el = document.createElement('span');
     el.className = this.done ? 'cm-task is-done' : 'cm-task';
-    el.setAttribute('role', 'img');
+    el.setAttribute('role', 'checkbox');
+    el.setAttribute('aria-checked', String(this.done));
     el.setAttribute('aria-label', this.done ? 'Done' : 'To do');
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const at = view.posAtDOM(el);
+      const line = view.state.doc.lineAt(at);
+      const box = /\[([ xX])\]/.exec(line.text.slice(at - line.from));
+      if (!box) return;
+      const pos = at + box.index + 1;
+      view.dispatch({ changes: { from: pos, to: pos + 1, insert: box[1] === ' ' ? 'x' : ' ' }, userEvent: 'input.toggle' });
+    });
     return el;
   }
 }
