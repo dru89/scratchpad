@@ -5,7 +5,7 @@
 import { bridge, type DraftState, type DraftSummary } from './bridge';
 import type { DraftController } from './controller';
 import { COPY_ITEMS, type CopyWhat, copyDraft, duplicateDraft, getDraft } from './draftops';
-import { escapeHtml, kbd, markMatches, relativeTime, searchTerms } from './format';
+import { escapeHtml, kbd, longTime, markMatches, searchTerms } from './format';
 import { icon } from './icons';
 import type { Rpc } from './rpc';
 
@@ -232,7 +232,7 @@ export class Sidebar {
         return `<div class="item${selected}" data-id="${d.id}" role="option" tabindex="0">
           <div class="item-title">${markMatches(d.title, terms)}</div>
           ${text ? `<div class="item-snippet">${text}</div>` : ''}
-          <div class="item-time">${relativeTime(d.modifiedAt, now)}</div>
+          <div class="item-time">${longTime(d.modifiedAt, now)}</div>
         </div>`;
       })
       .join('');

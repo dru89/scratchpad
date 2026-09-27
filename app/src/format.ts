@@ -13,6 +13,29 @@ export function relativeTime(ms: number, now = Date.now()): string {
 }
 
 /**
+ * When a draft was last modified, for a sidebar row where the time has its
+ * own line: "Just now", "12 minutes ago", "Today at 3:04 PM", "Yesterday at
+ * 3:04 PM", "Monday at 3:04 PM", "Sep 12", "Sep 12, 2025". The time of day
+ * follows the locale's clock.
+ */
+export function longTime(ms: number, now = Date.now(), locale?: string): string {
+  const mins = Math.floor(Math.max(0, now - ms) / 60_000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return mins === 1 ? '1 minute ago' : `${mins} minutes ago`;
+  const date = new Date(ms);
+  const time = date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+  const days = dayNumber(new Date(now)) - dayNumber(date);
+  if (days === 0) return `Today at ${time}`;
+  if (days === 1) return `Yesterday at ${time}`;
+  if (days < 7) return `${date.toLocaleDateString(locale, { weekday: 'long' })} at ${time}`;
+  const sameYear = date.getFullYear() === new Date(now).getFullYear();
+  return date.toLocaleDateString(locale, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Days since the epoch in local time, so "yesterday" follows the calendar, not 24 hours. */
+const dayNumber = (d: Date) => Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000);
+
+/**
  * The title this window shows while you type: the first line with text,
  * markdown stripped. The daemon's titles (crates/core/src/title.rs) are the
  * authority for lists; this keeps the window's own title instant.

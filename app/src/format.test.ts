@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kbd, localTitle, markMatches, relativeTime, searchTerms } from './format';
+import { kbd, localTitle, longTime, markMatches, relativeTime, searchTerms } from './format';
 import { shouldRollOver } from './idle';
 
 describe('localTitle', () => {
@@ -34,6 +34,31 @@ describe('relativeTime', () => {
     expect(relativeTime(now - 20_000, now)).toBe('now');
     expect(relativeTime(now - 5 * 60_000, now)).toBe('5m');
     expect(relativeTime(now - 3 * 3_600_000, now)).toBe('3h');
+  });
+});
+
+describe('longTime', () => {
+  const now = new Date(2026, 8, 26, 12, 0).getTime(); // a Saturday
+  // ICU puts a narrow no-break space before AM and PM.
+  const t = (ms: number) => longTime(ms, now, 'en-US').replace(/\u202f/g, ' ');
+  const at = (month: number, day: number, hour: number, minute = 0, year = 2026) =>
+    new Date(year, month - 1, day, hour, minute).getTime();
+
+  it('counts minutes for the last hour', () => {
+    expect(t(now - 20_000)).toBe('Just now');
+    expect(t(now - 60_000)).toBe('1 minute ago');
+    expect(t(now - 12 * 60_000)).toBe('12 minutes ago');
+  });
+
+  it('names the day for the last week, by the calendar', () => {
+    expect(t(at(9, 26, 9, 4))).toBe('Today at 9:04 AM');
+    expect(t(at(9, 25, 23, 30))).toBe('Yesterday at 11:30 PM');
+    expect(t(at(9, 21, 15, 4))).toBe('Monday at 3:04 PM');
+  });
+
+  it('gives the date after that', () => {
+    expect(t(at(9, 12, 15, 4))).toBe('Sep 12');
+    expect(t(at(12, 3, 10, 0, 2025))).toBe('Dec 3, 2025');
   });
 });
 
