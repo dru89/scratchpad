@@ -55,7 +55,8 @@ describe('markMatches', () => {
 
 describe('kbd', () => {
   it('makes one keycap per key, with glyphs for Enter and Backspace', () => {
-    expect(kbd('Mod+Enter')).toBe('<kbd class="kbd">Ctrl</kbd><kbd class="kbd">↵</kbd>');
+    expect(kbd('Mod+Enter', false)).toBe('<kbd class="kbd">Ctrl</kbd><kbd class="kbd">↵</kbd>');
+    expect(kbd('Mod+Enter', true)).toBe('<kbd class="kbd">⌘</kbd><kbd class="kbd">↵</kbd>');
     expect(kbd('Shift+Backspace')).toBe('<kbd class="kbd">Shift</kbd><kbd class="kbd">⌫</kbd>');
   });
 });

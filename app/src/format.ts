@@ -54,7 +54,7 @@ export function escapeHtml(s: string): string {
 }
 
 export const isMac = typeof navigator !== 'undefined' && navigator.platform.startsWith('Mac');
-const KEY_GLYPHS: Record<string, string> = { Mod: isMac ? '⌘' : 'Ctrl', Enter: '↵', Backspace: '⌫', Up: '↑', Down: '↓' };
+const KEY_GLYPHS: Record<string, string> = { Enter: '↵', Backspace: '⌫', Up: '↑', Down: '↓' };
 
 const MAC_MODIFIERS = ['Ctrl', 'Alt', 'Shift', 'Mod'];
 const MAC_GLYPHS: Record<string, string> = { Ctrl: '⌃', Alt: '⌥', Shift: '⇧', Mod: '⌘', Enter: '↩', Backspace: '⌫' };
@@ -72,10 +72,10 @@ export function shortcut(keys: string, mac = isMac): string {
 }
 
 /** Keycaps, one per key: kbd('Mod+Shift+A'). Mod is Ctrl, or ⌘ on macOS. */
-export function kbd(keys: string): string {
+export function kbd(keys: string, mac = isMac): string {
   return keys
     .split('+')
-    .map((k) => `<kbd class="kbd">${escapeHtml(KEY_GLYPHS[k] ?? k)}</kbd>`)
+    .map((k) => `<kbd class="kbd">${escapeHtml(k === 'Mod' ? (mac ? '⌘' : 'Ctrl') : (KEY_GLYPHS[k] ?? k))}</kbd>`)
     .join('');
 }
 
