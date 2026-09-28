@@ -934,6 +934,53 @@ input[type='search']::-webkit-search-cancel-button {
   vertical-align: middle;
 }
 
+/* Pasted images (editor/images.ts): their own size, but no wider than the
+   text and no taller than --image-max-height, with a hairline so a white
+   screenshot doesn't melt into the paper. Padding rather than margin, since
+   CodeMirror measures the widget's box. */
+.cm-image {
+  --image-max-height: 26em;
+  padding: 0.3em 0 0.5em;
+}
+
+.cm-image img {
+  display: block;
+  max-width: 100%;
+  max-height: var(--image-max-height);
+  height: auto;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+/* Its markdown, on the line being edited, which the link colors would
+   otherwise paint accent blue from end to end. */
+.cm-editor .cm-line.cm-image-source,
+.cm-editor .cm-line.cm-image-source * {
+  color: var(--ink-3);
+}
+
+.cm-image-missing {
+  padding: 0.6em 0.9em;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  font-size: 0.875em;
+}
+
+/* Shown only if storing the image takes long enough to notice. */
+.cm-image-pending {
+  color: var(--ink-3);
+  font-style: italic;
+  opacity: 0;
+  animation: sp-appear 150ms ease 250ms forwards;
+}
+
+@keyframes sp-appear {
+  to {
+    opacity: 1;
+  }
+}
+
 /* Quotes: the > is hidden off the cursor's line, and the bar is a
    background, so revealing the > doesn't move it. */
 .cm-editor .cm-line.cm-quote {

@@ -6,7 +6,7 @@
 
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { binDir, launch } from './launch';
@@ -45,6 +45,25 @@ async function isVisible(kind: string): Promise<boolean> {
 
 function editorText(page: Page) {
   return page.locator('.cm-content').innerText();
+}
+
+/** A 40×30 blue PNG. */
+const BLUE =
+  'iVBORw0KGgoAAAANSUhEUgAAACgAAAAeCAYAAABe3VzdAAAAMUlEQVR42u3OoQEAAAQAMH/5ztEqF+jCwvoiq+ezEBQUFBQUFBQUFBQUFBQUFBQUvCxkTqMVg6vi6AAAAABJRU5ErkJggg==';
+
+/** Pastes an image into the editor, as the clipboard would hand it over. */
+async function pasteImage(page: Page, base64: string, text?: string) {
+  await page.evaluate(
+    ([base64, text]) => {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const data = new DataTransfer();
+      data.items.add(new File([bytes], 'image.png', { type: 'image/png' }));
+      if (text) data.setData('text/plain', text);
+      const content = document.querySelector('.cm-content')!;
+      content.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    },
+    [base64, text ?? ''] as const,
+  );
 }
 
 async function shot(page: Page, name: string) {
@@ -383,5 +402,59 @@ test.describe.serial('scratchpad app', () => {
     expect((await offered())[1]).toMatch(/\/Errands\.md$/);
     expect(readFileSync(paths.md, 'utf8')).toBe(run('show', id).replace(/\n$/, ''));
     await expect(main.locator('#toast')).toHaveText('Exported');
+  });
+
+  test('a pasted image is stored, shown, copied and exported', async () => {
+    const main = await windowOf('main');
+    await main.keyboard.press('ControlOrMeta+n');
+    await main.keyboard.type('# Screenshot\n\nThe bug:\n');
+    await pasteImage(main, BLUE);
+    await expect.poll(() => list().some((d) => d.title === 'Screenshot')).toBe(true);
+    const id = list().find((d) => d.title === 'Screenshot')!.id;
+    await expect.poll(() => run('show', id)).toMatch(/^# Screenshot\n\nThe bug:\n!\[\]\(attachment:[0-9a-f]{32}\.png\)\n/);
+    const name = /attachment:([0-9a-f]{32}\.png)/.exec(run('show', id))![1];
+    expect(readdirSync(join(dir, 'data', 'attachments'))).toContain(name);
+
+    // The cursor went to the line below, so the picture shows instead of its markdown.
+    const img = main.locator('.cm-image img');
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBe(40);
+    await expect(main.locator('.cm-line', { hasText: 'attachment:' })).toHaveCount(0);
+    // Up steps onto its line rather than over the picture, and the markdown
+    // shows above it; so does clicking the picture.
+    await main.keyboard.type('After the picture.');
+    const raw = main.locator('.cm-line', { hasText: 'attachment:' });
+    await main.keyboard.press('ArrowUp');
+    await expect(raw).toHaveCount(1);
+    await expect(img).toBeVisible();
+    await shot(main, 'pasted-image');
+    await main.keyboard.press('ControlOrMeta+End');
+    await expect(raw).toHaveCount(0);
+    await img.click();
+    await expect(raw).toHaveCount(1);
+
+    // Spreadsheets put a picture beside the text they copy: that pastes as text.
+    await main.keyboard.press('ControlOrMeta+End');
+    await pasteImage(main, BLUE, 'a\tb');
+    await expect.poll(() => run('show', id)).toMatch(/After the picture\.a\tb\n$/);
+
+    await main.keyboard.press('ControlOrMeta+Shift+C');
+    await expect(main.locator('#toast')).toHaveText('Copied as rich text');
+    const html = await app.evaluate(async ({ clipboard }) => {
+      const [item] = await clipboard.read();
+      return (item.getType('text/html') as Promise<Blob>).then((b) => b.text());
+    });
+    expect(html).toContain(`src="data:image/png;base64,${BLUE}"`);
+
+    const zip = join(dir, 'one.zip');
+    await app.evaluate(({ dialog }, zip) => {
+      dialog.showSaveDialog = (async () => ({ canceled: false, filePath: zip })) as typeof dialog.showSaveDialog;
+    }, zip);
+    await app.evaluate(({ BrowserWindow, Menu }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('kind=main'));
+      Menu.getApplicationMenu()!.getMenuItemById('export')!.click(undefined, win);
+    });
+    await expect.poll(() => existsSync(zip)).toBe(true);
+    const listing = execFileSync('unzip', ['-Z1', zip], { encoding: 'utf8' }).trim().split('\n');
+    expect(listing.sort()).toEqual(['Screenshot.md', `attachments/${name}`]);
   });
 });

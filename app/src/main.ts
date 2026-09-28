@@ -73,6 +73,7 @@ async function start() {
     }</main>`;
 
   const controller = new DraftController(document.getElementById('editor')!, rpc, kind, info.prefs, info.idleMs);
+  controller.onNotice = (message) => toast(message, null);
   const switcher = new Switcher(rpc, controller);
   const infoPanel = new InfoPanel(rpc, (m) => toast(m), () => controller.focus());
   const showInfo = (id: string) => void infoPanel.show(id).catch(() => toast("Couldn't get info: scratchpadd isn't reachable", null));

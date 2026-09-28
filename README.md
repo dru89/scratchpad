@@ -26,7 +26,9 @@ It's inspired by [Drafts](https://getdrafts.com), and it runs on macOS and Linux
   <img alt="The capture window, pinned and floating on top, with Done at the bottom right" src="docs/images/capture-light.png" width="560">
 </picture>
 
-**Copy as rich text.** One shortcut puts the draft on the clipboard as formatted text, with the markdown alongside, so pasting into Slack, email or a document keeps the formatting.
+**Images.** Paste a screenshot or drop an image file and it shows in the draft. The markdown holds a reference to it, and the picture itself is stored once beside your drafts, however many drafts use it.
+
+**Copy as rich text.** One shortcut puts the draft on the clipboard as formatted text, images included, with the markdown alongside, so pasting into Slack, email or a document keeps the formatting.
 
 **Find anything.** ⌘K opens a quick switcher that searches the title and text of every draft. The sidebar filter narrows the list you're looking at, and ⌘F finds within a draft.
 
@@ -115,11 +117,11 @@ For AI agents, `scratchpad mcp` is an MCP server. To add it to Claude Code for e
 claude mcp add --scope user scratchpad -- ~/.local/bin/scratchpad mcp
 ```
 
-Agents can list, search, read, create, update and append to drafts, and archive, trash or restore them. None of the tools delete anything permanently. Results include each draft's link, so an agent can hand you one to click.
+Agents can list, search, read, create, update and append to drafts, look at the images in them, and archive, trash or restore them. None of the tools delete anything permanently. Results include each draft's link, so an agent can hand you one to click.
 
 ## Your data
 
-Drafts live in `~/Library/Application Support/dev.unremarkable.scratchpad/` on macOS and `~/.local/share/scratchpad/` on Linux. There's no sync yet, and your drafts never leave your computer; the Mac app only checks GitHub for new versions. To take everything with you, **File > Export All…** saves every draft as markdown in a zip, in Inbox, Archive and Trash folders, with a `drafts.json` that records ids and dates. **Export…** in the Draft menu saves a single draft as a `.md` file, and `scratchpad export` does the same as Export All from the terminal.
+Drafts live in `~/Library/Application Support/dev.unremarkable.scratchpad/` on macOS and `~/.local/share/scratchpad/` on Linux. There's no sync yet, and your drafts never leave your computer; the Mac app only checks GitHub for new versions. To take everything with you, **File > Export All…** saves every draft as markdown in a zip, in Inbox, Archive and Trash folders, with images in an `attachments` folder and a `drafts.json` that records ids and dates. **Export…** in the Draft menu saves a single draft as a `.md` file, or as a zip with its images, and `scratchpad export` does the same as Export All from the terminal. An image no draft uses anymore, counting the Trash, is deleted 30 days later.
 
 ## Status
 

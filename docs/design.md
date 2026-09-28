@@ -80,6 +80,9 @@ The daemon uses one SQLite database (WAL mode):
 - `drafts`: the index used for lists, holding id, state, title, preview (the text after the title, stripped of markdown), createdAt, modifiedAt and trashedAt.
 - `drafts_fts`: an FTS5 table using the trigram tokenizer, over each draft's title and plain text.
 - `tombstones`: id and deletedAt.
+- `attachment_orphans`: each attachment no draft uses, and since when (see [Attachments](#attachments)). Older versions never read it, so it didn't change the schema version.
+
+Pasted images are files in `attachments/` beside the database, not rows.
 
 `drafts` and `drafts_fts` are derived from `docs`, and the daemon rebuilds them on startup if the counts disagree. A schema change there means a migration plus a reindex, never a data conversion. A plain markdown export of every draft is always one command away, as a way out (see [Export](#export)).
 
@@ -111,8 +114,10 @@ Every `id` parameter accepts a full id or any unique prefix of one, case-insensi
 | `drafts.setState` | `id`, `state` | Doesn't change `modifiedAt`. |
 | `drafts.discard` | `id` | Deletes a draft outright. Refused unless the body is empty. |
 | `drafts.emptyTrash` | | Deletes everything in the Trash now and returns `deleted`, the count. The app asks first; the CLI and MCP server don't offer it. |
-| `drafts.export` | `path` (absolute), `zip?`, `overwrite?` | Writes every draft as markdown (see [Export](#export)) to a new or empty folder, or with `zip` to a zip file, replacing an existing one only with `overwrite`. Returns `drafts`, the count. Not offered to agents. |
-| `drafts.render` | `id` or `text` | `{html}`: GitHub-flavored HTML with raw HTML dropped, for rich copy. |
+| `drafts.export` | `path` (absolute), `zip?`, `overwrite?`, `id?` | Writes every draft as markdown (see [Export](#export)) to a new or empty folder, or with `zip` to a zip file, replacing an existing one only with `overwrite`. With `id`, writes only that draft and its images. Returns `drafts`, the count. Not offered to agents. |
+| `drafts.render` | `id` or `text` | `{html}`: GitHub-flavored HTML with raw HTML dropped, for rich copy. Attachments are inlined as `data:` URLs. |
+| `attachments.add` | `data` (base64) | Stores an image and returns its `name` and `size`. The same bytes always get the same name. PNG, JPEG, GIF and WebP up to 32 MB; anything else is an invalid-params error. |
+| `attachments.get` | `name` | `{name, type, data}`, the image as base64. For the MCP server; windows read the files directly. |
 | `drafts.subscribe` / `unsubscribe` | | Notifications: `drafts.changed {summary}`, `drafts.removed {id}`. |
 | `doc.open` | `id`, `version?` (a version vector) | A snapshot, or the updates since `version`, plus the daemon's version vector. Starts `doc.update {id, update}` notifications for that draft. One task handles every request in order, so the reply always reaches the client before any update for that draft. |
 | `doc.push` | `id`, `update` | Applies a Loro update from an editor window and relays it to the draft's other windows. Updates the daemon already has are ignored. |
@@ -126,7 +131,7 @@ Errors use JSON-RPC codes plus `-32001` no such draft, `-32002` ambiguous id (wi
 
 **CLI.** `scratchpad` covers `list`, `search`, `show`, `new`, `append`, `set`, `edit`, `archive`, `trash`, `restore`, `render`, `capture`, `open` and `daemon start|status|stop`, with `--json` on everything. `edit` opens `$VISUAL`/`$EDITOR` and writes back with `baseVersion`, so typing done in the app while the editor was open is kept.
 
-**MCP.** `scratchpad mcp` offers `list_drafts`, `search_drafts`, `get_draft`, `create_draft`, `update_draft`, `append_to_draft`, `archive_draft`, `trash_draft` and `restore_draft`. Its instructions tell agents they're one editor among several: read with `get_draft`, send revisions with that version as `base_version`, re-read when a result says `merged: true`, and use `known_version` to check cheaply for changes. No tool deletes permanently.
+**MCP.** `scratchpad mcp` offers `list_drafts`, `search_drafts`, `get_draft`, `get_image`, `create_draft`, `update_draft`, `append_to_draft`, `archive_draft`, `trash_draft` and `restore_draft`. Its instructions tell agents they're one editor among several: read with `get_draft`, send revisions with that version as `base_version`, re-read when a result says `merged: true`, and use `known_version` to check cheaply for changes. They also say what an `attachment:` reference is, that `get_image` shows one, and to keep the references when editing. No tool deletes permanently.
 
 ## Editor windows
 
@@ -216,19 +221,36 @@ Each result carries a snippet: a line of plain text around the first match outsi
 
 Qualifiers like `in:archive`, and saved searches as a light form of organization, come later.
 
+## Attachments
+
+A pasted or dropped image becomes an attachment ([`crates/core/src/attachments.rs`](../crates/core/src/attachments.rs)), and the draft gets an ordinary markdown image that refers to it:
+
+```markdown
+![](attachment:3f2a9c0e1b7d4a6f8e2c5b9d0a1f3e7c.png)
+```
+
+- **Storage.** The file lives in `attachments/` in the data folder, named by the first 128 bits of the SHA-256 of its bytes, so the same image is stored once however many drafts use it. The daemon writes it beside its final name and renames it into place. The bytes never go into the draft's Loro document, which keeps typing, syncing and history as cheap as they were.
+- **Formats.** PNG, JPEG, GIF and WebP, which every place a draft is shown can display, up to 32 MB. The daemon goes by the bytes, not the name or claimed type. Nothing is looked up on disk unless its name is 32 hex digits and one of those extensions.
+- **In the editor** ([`editor/images.ts`](../app/src/editor/images.ts)). Pasting an image (when the clipboard holds no text other than the file's own name, since spreadsheets put a picture beside the cells they copy) or dropping one sends it to `attachments.add` and inserts the reference on a line of its own, with the cursor on the line after. A line that's only an attachment image shows as the picture: its natural size, capped at the text width and a maximum height. On the line being edited, the markdown shows above the picture instead of replacing it, so the picture doesn't jump away while the cursor passes. Up and Down step onto that line rather than over the picture, and clicking the picture puts the cursor there too. An image elsewhere in a line stays as markdown.
+- **Serving.** Windows load `attachment:<name>` through a custom protocol the app registers, straight from the folder; the page's content security policy allows that scheme for images and nothing else.
+- **Cleanup.** An attachment is kept while any draft refers to it, the Trash included. The hourly sweep that empties the Trash also finds attachments nothing refers to, notes the time in `attachment_orphans`, and deletes them 30 days later unless something refers to them again by then. The grace period covers undoing a deleted image, and a draft's text coming back from an export.
+- **Everywhere else.** Export copies the images a draft uses (see [Export](#export)). Rich copy inlines them. The MCP server's `get_image` shows one to an agent.
+- **Sync, later.** Attachments will travel as separate encrypted blobs, uploaded once and fetched when a draft needs them, under a keyed hash rather than the plain content hash, so the server can't test whether you have a known image.
+
 ## Export
 
 An export is every draft as markdown, in the layout an import could read back:
 
 - `Inbox/`, `Archive/` and `Trash/`, one `.md` file per draft holding its markdown exactly, with no front matter.
 - Files are named from the title, made safe for macOS, Linux and Windows: no path separators, reserved or control characters, no leading dots, 80 characters at most, and "Untitled" when nothing is left. When two drafts in a folder would share a name (ignoring case), the older one gets " 2". Each file is dated with its draft's `modifiedAt`.
-- `drafts.json` lists each draft's id, title, state, file, and created, modified and trashed times.
+- `attachments/` holds the images the drafts use, and each draft's references are rewritten to relative links (`../attachments/<name>`), so any markdown app shows them.
+- `drafts.json` lists each draft's id, title, state, file, the attachments it uses, and created, modified and trashed times.
 
-The daemon writes it ([`crates/core/src/export.rs`](../crates/core/src/export.rs)), taking open drafts from memory so the latest typing is in it. `scratchpad export <dir>` writes a folder, which has to be new or empty, and `--zip` a zip (`--force` to replace one). In the app, File > Export All… saves a zip, `scratchpad-<date>.zip` by default. Export… in the Draft menu and the sidebar's context menu saves one draft as a `.md` file, named the same way.
+The daemon writes it ([`crates/core/src/export.rs`](../crates/core/src/export.rs)), taking open drafts from memory so the latest typing is in it. `scratchpad export <dir>` writes a folder, which has to be new or empty, and `--zip` a zip (`--force` to replace one). In the app, File > Export All… saves a zip, `scratchpad-<date>.zip` by default. Export… in the Draft menu and the sidebar's context menu saves one draft as a `.md` file, named the same way. A draft with images saves as a zip instead, holding the `.md` and an `attachments/` folder beside it.
 
 ## Rich copy
 
-"Copy as rich text" copies the selection, or the whole draft if nothing is selected. The app gets HTML from `drafts.render` and writes both `text/html` and the markdown as `text/plain` to the clipboard.
+"Copy as rich text" copies the selection, or the whole draft if nothing is selected. The app gets HTML from `drafts.render` and writes both `text/html` and the markdown as `text/plain` to the clipboard. Images go in the HTML as `data:` URLs, so they arrive in apps that accept pasted pictures.
 
 ## Not in v1
 

@@ -5,7 +5,7 @@
 
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -296,6 +296,21 @@ test.describe.serial('design screenshots', () => {
     await shot(main, '18-selection-into-code');
     await main.locator('.cm-line', { hasText: 'Ship sync before' }).click({ clickCount: 3 });
     await shot(main, '19-triple-clicked-line');
+
+    // A pasted screenshot, then with the cursor on its line.
+    const { name } = await daemonCall('attachments.add', {
+      data: readFileSync(join(__dirname, '..', '..', 'docs', 'images', 'switcher.png')).toString('base64'),
+    });
+    await seed({
+      age: 20 * 60 * 1000,
+      text: `Switcher bug\n\nSearch results cover the toolbar when the window is short:\n![](attachment:${name})\nHappens at 600px tall or less.`,
+    });
+    await main.locator('#sidebar .item-title', { hasText: 'Switcher bug' }).click();
+    await cursorAtEndOf(main, 'Happens at 600px');
+    await expect.poll(() => main.locator('.cm-image img').evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+    await shot(main, '23-pasted-image');
+    await main.keyboard.press('ArrowUp');
+    await shot(main, '24-pasted-image-editing-dark', 'dark');
 
     // A tooltip.
     await main.locator('.toolbar .tool[data-action="float"]').hover();

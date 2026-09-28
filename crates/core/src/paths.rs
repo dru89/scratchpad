@@ -42,4 +42,9 @@ impl Paths {
     pub fn log(&self) -> PathBuf {
         self.data_dir.join("daemon.log")
     }
+
+    /// Pasted images (crate::attachments).
+    pub fn attachments(&self) -> PathBuf {
+        self.data_dir.join("attachments")
+    }
 }

@@ -9,7 +9,7 @@ import { bridge, type DraftState, type DraftSummary, type WindowKind, type Windo
 import { editorExtensions } from './editor/setup';
 import { localTitle } from './format';
 import { shouldRollOver } from './idle';
-import type { Rpc } from './rpc';
+import { type Rpc, toB64 } from './rpc';
 import { DocSession } from './session';
 
 export class DraftController {
@@ -19,6 +19,8 @@ export class DraftController {
   loadedAt: number;
   /** Called when the open draft is deleted elsewhere. */
   onRemoved: () => void = () => this.newDraft();
+  /** Called with something the window should tell the user, like an image that couldn't be added. */
+  onNotice: (message: string) => void = () => {};
 
   private binding: Binding | null = null;
   private slot = new Compartment();
@@ -79,7 +81,21 @@ export class DraftController {
     const placeholder = this.kind === 'capture' ? 'Dump a thought…' : 'Start typing…';
     return EditorState.create({
       doc,
-      extensions: [this.slot.of(binding), editorExtensions({ placeholder, onUpdate: (u) => this.onUpdate(u) })],
+      extensions: [
+        this.slot.of(binding),
+        editorExtensions({
+          placeholder,
+          onUpdate: (u) => this.onUpdate(u),
+          images: {
+            // Like typing, a paste right after launch waits for the daemon.
+            add: async (bytes) => {
+              await this.rpc.whenReady();
+              return (await this.rpc.call<{ name: string }>('attachments.add', { data: toB64(bytes) })).name;
+            },
+            failed: (message) => this.onNotice(message),
+          },
+        }),
+      ],
     });
   }
 

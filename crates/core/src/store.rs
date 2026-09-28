@@ -3,7 +3,8 @@
 //! `docs` and `doc_updates` hold the Loro history and are the source of
 //! truth. `drafts` and `drafts_fts` are an index derived from them and can be
 //! rebuilt at any time. `tombstones` remembers deletions so sync can't bring a
-//! deleted draft back.
+//! deleted draft back. `attachment_orphans` notes when each attachment stopped
+//! being used, so it's deleted a while later (docs/design.md#attachments).
 
 use crate::draft;
 use crate::protocol::{DraftState, DraftSummary, EMPTY_TITLE};
@@ -11,6 +12,7 @@ use crate::search;
 use anyhow::{Context, Result, bail};
 use loro::{ExportMode, LoroDoc};
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
+use std::collections::HashMap;
 use std::path::Path;
 
 /// 2 added drafts.preview.
@@ -127,6 +129,14 @@ impl Store {
                 "ALTER TABLE drafts ADD COLUMN preview TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 2;",
             )?;
         }
+        // A table older builds never read doesn't change the schema version,
+        // so going back a version still opens the database.
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS attachment_orphans (
+                name TEXT PRIMARY KEY,
+                since INTEGER NOT NULL
+            );",
+        )?;
         Ok(Store { conn, refresh_index })
     }
 
@@ -334,6 +344,31 @@ impl Store {
     pub fn indexed_count(&self) -> Result<i64> {
         Ok(self.conn.query_row("SELECT count(*) FROM drafts", [], |r| r.get(0))?)
     }
+
+    /// Every draft's text as last indexed, for finding the attachments in use.
+    pub fn all_bodies(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT body FROM drafts_fts")?;
+        Ok(stmt.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?)
+    }
+
+    // ---- attachments ----------------------------------------------------
+
+    /// Attachments no draft uses, and since when.
+    pub fn attachment_orphans(&self) -> Result<HashMap<String, i64>> {
+        let mut stmt = self.conn.prepare("SELECT name, since FROM attachment_orphans")?;
+        Ok(stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<Result<_, _>>()?)
+    }
+
+    pub fn set_attachment_orphan(&mut self, name: &str, since: i64) -> Result<()> {
+        self.conn
+            .execute("INSERT OR REPLACE INTO attachment_orphans (name, since) VALUES (?1, ?2)", params![name, since])?;
+        Ok(())
+    }
+
+    pub fn clear_attachment_orphan(&mut self, name: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM attachment_orphans WHERE name = ?1", [name])?;
+        Ok(())
+    }
 }
 
 fn summary_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<DraftSummary> {
@@ -498,6 +533,21 @@ mod tests {
             ..Default::default()
         };
         assert!(s.list(&q).unwrap().0.is_empty());
+    }
+
+    #[test]
+    fn remembers_orphaned_attachments_and_bodies() {
+        let mut s = Store::open_in_memory().unwrap();
+        add(&mut s, "A", "# One\n\n![](attachment:x)", DraftState::Inbox, 1);
+        add(&mut s, "B", "Two", DraftState::Trashed, 2);
+        let mut bodies = s.all_bodies().unwrap();
+        bodies.sort();
+        assert_eq!(bodies, ["# One\n\n![](attachment:x)", "Two"]);
+
+        s.set_attachment_orphan("a.png", 10).unwrap();
+        s.set_attachment_orphan("b.png", 20).unwrap();
+        s.clear_attachment_orphan("a.png").unwrap();
+        assert_eq!(s.attachment_orphans().unwrap(), HashMap::from([("b.png".to_string(), 20)]));
     }
 
     #[test]

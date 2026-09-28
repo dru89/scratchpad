@@ -193,6 +193,24 @@ pub struct ExportParams {
     /// Replace an existing zip.
     #[serde(default)]
     pub overwrite: bool,
+    /// Export only this draft: its markdown and the images it uses, without
+    /// the Inbox/Archive/Trash folders or the manifest.
+    #[serde(default)]
+    pub id: Option<String>,
+}
+
+/// attachments.add: an image's bytes, base64-encoded.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddAttachmentParams {
+    pub data: String,
+}
+
+/// attachments.get: an attachment's name, as in `attachment:<name>`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentParams {
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

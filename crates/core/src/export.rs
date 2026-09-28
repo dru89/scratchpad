@@ -1,16 +1,18 @@
 //! Exporting every draft as markdown (docs/design.md#export): a folder per
 //! place (Inbox, Archive, Trash), a file per draft named from its title and
 //! dated like it, and a `drafts.json` manifest with what the files leave out.
-//! The same entries go to a folder or a zip.
+//! Images go in `attachments/`, with each draft's links rewritten to point
+//! there. The same entries go to a folder or a zip.
 
+use crate::attachments::{self, Attachments};
 use crate::protocol::{DraftState, DraftSummary, EMPTY_TITLE};
 use crate::time::{civil, iso8601};
 use anyhow::{Context, Result, bail};
 use serde_json::json;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 /// Longest file name, in characters, before ".md".
@@ -19,9 +21,15 @@ const MAX_STEM: usize = 80;
 /// One file of an export, at a path relative to its root.
 pub struct Entry {
     pub path: String,
-    pub contents: Vec<u8>,
+    pub contents: Contents,
     /// Milliseconds since the epoch.
     pub modified: i64,
+}
+
+pub enum Contents {
+    Bytes(Vec<u8>),
+    /// An attachment, copied from where it's kept rather than read into memory.
+    File(PathBuf),
 }
 
 /// A title made safe to use as a file name on macOS, Linux and Windows:
@@ -50,14 +58,16 @@ fn folder(state: DraftState) -> &'static str {
 }
 
 /// The files of an export: each draft's markdown, newest first so a name
-/// clash renames the older draft ("Title 2.md"), and the manifest.
-pub fn entries(drafts: &[(DraftSummary, String)], now: i64, by: &str) -> Vec<Entry> {
+/// clash renames the older draft ("Title 2.md"), the images they use, and
+/// the manifest.
+pub fn entries(drafts: &[(DraftSummary, String)], store: &Attachments, now: i64, by: &str) -> Vec<Entry> {
     let mut sorted: Vec<&(DraftSummary, String)> = drafts.iter().collect();
     sorted.sort_by(|a, b| b.0.modified_at.cmp(&a.0.modified_at).then_with(|| b.0.id.cmp(&a.0.id)));
     // Lowercased, since macOS and Windows file systems ignore case.
     let mut taken = HashSet::new();
     let mut files = Vec::new();
     let mut manifest = Vec::new();
+    let mut used = BTreeSet::new();
     for (summary, body) in sorted {
         let dir = folder(summary.state);
         let stem = file_stem(&summary.title);
@@ -78,16 +88,53 @@ pub fn entries(drafts: &[(DraftSummary, String)], now: i64, by: &str) -> Vec<Ent
         if let Some(t) = summary.trashed_at {
             record["trashed"] = json!(iso8601(t));
         }
+        let images: BTreeSet<&str> = attachments::references(body).collect();
+        if !images.is_empty() {
+            record["attachments"] = json!(images);
+        }
+        used.extend(images);
         manifest.push(record);
-        files.push(Entry { path, contents: body.clone().into_bytes(), modified: summary.modified_at });
+        let text = attachments::replace_references(body, |name| format!("../attachments/{name}"));
+        files.push(Entry { path, contents: Contents::Bytes(text.into_bytes()), modified: summary.modified_at });
     }
+    files.extend(attachment_entries(used, store, now));
     let manifest = json!({ "exported": iso8601(now), "by": by, "drafts": manifest });
     files.push(Entry {
         path: "drafts.json".into(),
-        contents: serde_json::to_vec_pretty(&manifest).expect("json"),
+        contents: Contents::Bytes(serde_json::to_vec_pretty(&manifest).expect("json")),
         modified: now,
     });
     files
+}
+
+/// One draft on its own: its markdown, named from its title, and the
+/// images it uses in `attachments/` beside it.
+pub fn draft_entries(summary: &DraftSummary, body: &str, store: &Attachments, now: i64) -> Vec<Entry> {
+    let text = attachments::replace_references(body, |name| format!("attachments/{name}"));
+    let mut files = vec![Entry {
+        path: format!("{}.md", file_stem(&summary.title)),
+        contents: Contents::Bytes(text.into_bytes()),
+        modified: summary.modified_at,
+    }];
+    files.extend(attachment_entries(attachments::references(body).collect(), store, now));
+    files
+}
+
+/// The attachments in `names` that are here, under `attachments/`, each
+/// dated from when it was added.
+fn attachment_entries(names: BTreeSet<&str>, store: &Attachments, now: i64) -> Vec<Entry> {
+    names
+        .into_iter()
+        .filter_map(|name| {
+            let path = store.path(name)?;
+            let modified = std::fs::metadata(&path)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+                .map_or(now, |d| d.as_millis() as i64);
+            Some(Entry { path: format!("attachments/{name}"), contents: Contents::File(path), modified })
+        })
+        .collect()
 }
 
 fn system_time(ms: i64) -> SystemTime {
@@ -104,7 +151,15 @@ pub fn write_dir(entries: &[Entry], dir: &Path) -> Result<()> {
         let path = dir.join(&entry.path);
         std::fs::create_dir_all(path.parent().expect("entries have a parent"))?;
         let mut file = File::create(&path).with_context(|| format!("writing {}", path.display()))?;
-        file.write_all(&entry.contents)?;
+        match &entry.contents {
+            Contents::Bytes(bytes) => file.write_all(bytes)?,
+            Contents::File(from) => {
+                std::io::copy(
+                    &mut File::open(from).with_context(|| format!("reading {}", from.display()))?,
+                    &mut file,
+                )?;
+            }
+        }
         file.set_modified(system_time(entry.modified))?;
     }
     Ok(())
@@ -125,10 +180,19 @@ pub fn write_zip(entries: &[Entry], path: &Path, overwrite: bool) -> Result<()> 
         let c = civil(entry.modified);
         let when = zip::DateTime::from_date_and_time(c.year as u16, c.month, c.day, c.hour, c.minute, c.second)
             .unwrap_or_default();
-        let options =
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated).last_modified_time(when);
+        // Images are compressed already.
+        let method = match entry.contents {
+            Contents::Bytes(_) => zip::CompressionMethod::Deflated,
+            Contents::File(_) => zip::CompressionMethod::Stored,
+        };
+        let options = SimpleFileOptions::default().compression_method(method).last_modified_time(when);
         zip.start_file(entry.path.as_str(), options)?;
-        zip.write_all(&entry.contents)?;
+        match &entry.contents {
+            Contents::Bytes(bytes) => zip.write_all(bytes)?,
+            Contents::File(from) => {
+                std::io::copy(&mut File::open(from).with_context(|| format!("reading {}", from.display()))?, &mut zip)?;
+            }
+        }
     }
     zip.finish()?;
     std::fs::rename(&partial, path).with_context(|| format!("moving the export to {}", path.display()))?;
@@ -138,7 +202,19 @@ pub fn write_zip(entries: &[Entry], path: &Path, overwrite: bool) -> Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::attachments::PIXEL;
     use std::io::Read;
+
+    fn bytes(entry: &Entry) -> Vec<u8> {
+        match &entry.contents {
+            Contents::Bytes(b) => b.clone(),
+            Contents::File(p) => std::fs::read(p).unwrap(),
+        }
+    }
+
+    fn no_attachments() -> Attachments {
+        Attachments::new(PathBuf::from("/nonexistent/attachments"))
+    }
 
     fn draft(id: &str, title: &str, state: DraftState, modified: i64) -> (DraftSummary, String) {
         let summary = DraftSummary {
@@ -173,11 +249,11 @@ mod tests {
             draft("C", "Ideas", DraftState::Archived, 100),
             draft("D", "Old", DraftState::Trashed, 50),
         ];
-        let files = entries(&drafts, 400, "test");
+        let files = entries(&drafts, &no_attachments(), 400, "test");
         let paths: Vec<&str> = files.iter().map(|e| e.path.as_str()).collect();
         assert_eq!(paths, ["Inbox/Ideas.md", "Inbox/ideas 2.md", "Archive/Ideas.md", "Trash/Old.md", "drafts.json"]);
-        assert_eq!(files[0].contents, b"# Ideas\n\nbody of A\n");
-        let manifest: serde_json::Value = serde_json::from_slice(&files[4].contents).unwrap();
+        assert_eq!(bytes(&files[0]), b"# Ideas\n\nbody of A\n");
+        let manifest: serde_json::Value = serde_json::from_slice(&bytes(&files[4])).unwrap();
         assert_eq!(manifest["drafts"][1]["id"], "B");
         assert_eq!(manifest["drafts"][1]["file"], "Inbox/ideas 2.md");
         assert_eq!(manifest["drafts"][3]["state"], "trashed");
@@ -188,7 +264,12 @@ mod tests {
     fn a_folder_export_keeps_dates_and_refuses_to_overwrite() {
         let dir = tempfile::tempdir().unwrap();
         let out = dir.path().join("export");
-        let files = entries(&[draft("A", "Ideas", DraftState::Inbox, 1_790_000_000_000)], 1_790_000_000_000, "test");
+        let files = entries(
+            &[draft("A", "Ideas", DraftState::Inbox, 1_790_000_000_000)],
+            &no_attachments(),
+            1_790_000_000_000,
+            "test",
+        );
         write_dir(&files, &out).unwrap();
         let path = out.join("Inbox/Ideas.md");
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Ideas\n\nbody of A\n");
@@ -200,7 +281,12 @@ mod tests {
     fn a_zip_export_holds_the_same_files() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("export.zip");
-        let files = entries(&[draft("A", "Ideas", DraftState::Inbox, 1_790_000_000_000)], 1_790_000_000_000, "test");
+        let files = entries(
+            &[draft("A", "Ideas", DraftState::Inbox, 1_790_000_000_000)],
+            &no_attachments(),
+            1_790_000_000_000,
+            "test",
+        );
         write_zip(&files, &path, false).unwrap();
         let mut zip = zip::ZipArchive::new(File::open(&path).unwrap()).unwrap();
         let mut text = String::new();
@@ -210,5 +296,43 @@ mod tests {
         assert!(write_zip(&files, &path, false).is_err(), "not over an existing file unless asked");
         write_zip(&files, &path, true).unwrap();
         assert!(!dir.path().join("export.zip.partial").exists());
+    }
+
+    #[test]
+    fn images_go_in_an_attachments_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Attachments::new(dir.path().join("attachments"));
+        let name = store.add(PIXEL).unwrap();
+        let missing = "0123456789abcdef0123456789abcdef.png";
+        let (mut summary, _) = draft("A", "Shots", DraftState::Inbox, 300);
+        let body = format!("# Shots\n\n![](attachment:{name})\n![](attachment:{missing})\n");
+        summary.title = "Shots".into();
+        let drafts = [(summary.clone(), body.clone()), draft("B", "Plain", DraftState::Archived, 200)];
+
+        let files = entries(&drafts, &store, 400, "test");
+        let paths: Vec<&str> = files.iter().map(|e| e.path.as_str()).collect();
+        let attachment = format!("attachments/{name}");
+        assert_eq!(paths, ["Inbox/Shots.md", "Archive/Plain.md", attachment.as_str(), "drafts.json"]);
+        let text = String::from_utf8(bytes(&files[0])).unwrap();
+        assert!(text.contains(&format!("![](../attachments/{name})")), "{text}");
+        assert_eq!(bytes(&files[2]), PIXEL);
+        let manifest: serde_json::Value = serde_json::from_slice(&bytes(&files[3])).unwrap();
+        assert_eq!(manifest["drafts"][0]["attachments"], json!([missing, name]));
+        assert!(manifest["drafts"][1].get("attachments").is_none());
+
+        let zip_path = dir.path().join("export.zip");
+        write_zip(&files, &zip_path, false).unwrap();
+        let mut zip = zip::ZipArchive::new(File::open(&zip_path).unwrap()).unwrap();
+        let mut image = Vec::new();
+        zip.by_name(&attachment).unwrap().read_to_end(&mut image).unwrap();
+        assert_eq!(image, PIXEL);
+
+        let one = draft_entries(&summary, &body, &store, 400);
+        let paths: Vec<&str> = one.iter().map(|e| e.path.as_str()).collect();
+        assert_eq!(paths, ["Shots.md", attachment.as_str()]);
+        assert!(String::from_utf8(bytes(&one[0])).unwrap().contains(&format!("![](attachments/{name})")));
+        let out = dir.path().join("one");
+        write_dir(&one, &out).unwrap();
+        assert_eq!(std::fs::read(out.join(&attachment)).unwrap(), PIXEL);
     }
 }

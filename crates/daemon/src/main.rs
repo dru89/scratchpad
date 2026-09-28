@@ -5,6 +5,7 @@ mod daemon;
 mod server;
 
 use anyhow::{Context, Result};
+use scratchpad_core::attachments::Attachments;
 use scratchpad_core::paths::Paths;
 use scratchpad_core::store::Store;
 use std::fs::{File, OpenOptions, TryLockError};
@@ -38,7 +39,7 @@ async fn main() -> Result<()> {
     std::fs::set_permissions(&paths.socket, std::fs::Permissions::from_mode(0o600))?;
 
     let store = Store::open(&paths.database())?;
-    let daemon = daemon::Daemon::new(store, Box::new(daemon::wall_clock))?;
+    let daemon = daemon::Daemon::new(store, Attachments::new(paths.attachments()), Box::new(daemon::wall_clock))?;
     eprintln!(
         "scratchpadd {} (pid {}) listening on {}",
         env!("CARGO_PKG_VERSION"),

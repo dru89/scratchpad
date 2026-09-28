@@ -36,7 +36,10 @@ Never pair a version with text you didn't read at that version; the merge would 
 append_to_draft adds to the end and needs no version. Ids can be shortened to any unique prefix. Nothing here deletes \
 permanently: trash_draft moves a draft to the Trash, which empties after 30 days.
 
-Each draft has a url, scratchpad://open/<id>, that opens it in the app. Give it to the user when you point them at a draft.";
+Each draft has a url, scratchpad://open/<id>, that opens it in the app. Give it to the user when you point them at a draft.
+
+Images the user pasted appear in the text as ![](attachment:<name>). get_image shows you one. Keep those references as they \
+are when you edit, or the image leaves the draft.";
 
 #[derive(Clone)]
 pub struct Scratchpad {
@@ -91,6 +94,12 @@ pub struct UpdateArgs {
     /// merged: false). With it, your change merges with edits made since; without it, your text replaces whatever the draft
     /// holds now, including anything the user just typed.
     pub base_version: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct ImageArgs {
+    /// The name from an ![](attachment:<name>) reference in a draft, such as 3f2a9c0e1b7d4a6f8e2c5b9d0a1f3e7c.png.
+    pub name: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -253,6 +262,21 @@ impl Scratchpad {
                 Err(e) => {
                     CallToolResult::error(vec![ContentBlock::text(format!("unexpected reply from scratchpadd: {e}"))])
                 }
+            },
+            Err(e) => e,
+        })
+    }
+
+    #[tool(
+        description = "Look at an image in a draft. Drafts refer to images as ![](attachment:<name>); pass the name.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_image(&self, Parameters(args): Parameters<ImageArgs>) -> Result<CallToolResult, McpError> {
+        let name = args.name.trim().trim_start_matches(scratchpad_core::attachments::SCHEME);
+        Ok(match self.call::<Value>("attachments.get", json!({ "name": name })).await {
+            Ok(v) => match (v["data"].as_str(), v["type"].as_str()) {
+                (Some(data), Some(mime)) => CallToolResult::success(vec![ContentBlock::image(data, mime)]),
+                _ => CallToolResult::error(vec![ContentBlock::text("unexpected reply from scratchpadd")]),
             },
             Err(e) => e,
         })

@@ -9,6 +9,7 @@ import type { Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap, placeholder, type ViewUpdate } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import { createFindPanel, openReplace, REPLACE_KEY } from './find';
+import { type ImageHost, imagePasting } from './images';
 import { indentKeys } from './indent';
 import { livePreview } from './livepreview';
 import { selectionLayer } from './selection';
@@ -56,7 +57,11 @@ const theme = EditorView.theme({
   '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'var(--highlight-strong)', color: 'var(--on-highlight-strong)' },
 });
 
-export function editorExtensions(opts: { placeholder: string; onUpdate: (u: ViewUpdate) => void }): Extension[] {
+export function editorExtensions(opts: {
+  placeholder: string;
+  onUpdate: (u: ViewUpdate) => void;
+  images: ImageHost;
+}): Extension[] {
   return [
     // No cursor while text is selected, as in most editors.
     drawSelection({ drawRangeCursor: false }),
@@ -70,6 +75,7 @@ export function editorExtensions(opts: { placeholder: string; onUpdate: (u: View
     theme,
     livePreview,
     tables,
+    imagePasting(opts.images),
     EditorView.lineWrapping,
     placeholder(opts.placeholder),
     EditorView.updateListener.of(opts.onUpdate),

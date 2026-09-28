@@ -241,6 +241,7 @@ fn mcp_tools_work_end_to_end() {
             "archive_draft",
             "create_draft",
             "get_draft",
+            "get_image",
             "list_drafts",
             "restore_draft",
             "search_drafts",
@@ -292,6 +293,17 @@ fn mcp_tools_work_end_to_end() {
     let missing = mcp.tool("get_draft", json!({ "id": "ZZZZ" }));
     assert_eq!(missing["isError"], true);
     assert!(missing["content"][0]["text"].as_str().unwrap().contains("no draft matches"));
+
+    // Pasted images: an agent sees the reference in the text and asks for it.
+    let name = "0123456789abcdef0123456789abcdef.png";
+    let png = b"\x89PNG\r\n\x1a\nnot a real picture";
+    std::fs::create_dir_all(env.dir.path().join("data/attachments")).unwrap();
+    std::fs::write(env.dir.path().join("data/attachments").join(name), png).unwrap();
+    let image = mcp.tool("get_image", json!({ "name": format!("attachment:{name}") }));
+    assert_eq!(image["content"][0]["type"], "image");
+    assert_eq!(image["content"][0]["mimeType"], "image/png");
+    assert_eq!(image["content"][0]["data"], "iVBORw0KGgpub3QgYSByZWFsIHBpY3R1cmU=");
+    assert_eq!(mcp.tool("get_image", json!({ "name": "nope.png" }))["isError"], true);
 }
 
 #[test]

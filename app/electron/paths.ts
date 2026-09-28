@@ -13,6 +13,11 @@ export function dataDir(): string {
   return join(process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'scratchpad');
 }
 
+/** Pasted images, which the daemon writes and windows show (crates/core/src/attachments.rs). */
+export function attachmentsDir(): string {
+  return join(dataDir(), 'attachments');
+}
+
 export function socketPath(): string {
   if (process.env.SCRATCHPAD_SOCKET) return process.env.SCRATCHPAD_SOCKET;
   if (process.platform !== 'darwin' && process.env.XDG_RUNTIME_DIR) {

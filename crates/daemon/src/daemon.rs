@@ -5,6 +5,7 @@
 
 use base64::{Engine, engine::general_purpose::STANDARD as B64};
 use loro::{CommitOptions, ExportMode, Frontiers, LoroDoc, UpdateOptions, VersionVector};
+use scratchpad_core::attachments::{self, AddError, Attachments};
 use scratchpad_core::draft;
 use scratchpad_core::protocol::{self as proto, DraftDetail, DraftState, DraftSummary, EMPTY_TITLE, RpcError, codes};
 use scratchpad_core::store::{IndexRow, ListQuery, Pending, Resolve, Store};
@@ -26,6 +27,10 @@ const COMPACT_BYTES: usize = 512 * 1024;
 /// Drop a loaded draft from memory after this long with no windows open.
 const UNLOAD_IDLE: Duration = Duration::from_secs(600);
 pub const TRASH_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1000;
+/// Delete an attachment this long after the last draft using it stops, the
+/// Trash included. Long enough that undoing a deleted image, or restoring a
+/// purged draft's text from somewhere, still finds it.
+pub const ATTACHMENT_RETENTION_MS: i64 = TRASH_RETENTION_MS;
 const DEFAULT_LIST_LIMIT: usize = 100;
 
 struct Client {
@@ -77,6 +82,7 @@ struct Dirty {
 
 pub struct Daemon {
     store: Store,
+    attachments: Attachments,
     clients: HashMap<ClientId, Client>,
     docs: HashMap<String, OpenDoc>,
     dirty: HashMap<String, Dirty>,
@@ -113,9 +119,10 @@ fn summary_from_doc(id: &str, doc: &LoroDoc) -> DraftSummary {
 }
 
 impl Daemon {
-    pub fn new(store: Store, clock: Box<dyn Fn() -> i64 + Send>) -> anyhow::Result<Daemon> {
+    pub fn new(store: Store, attachments: Attachments, clock: Box<dyn Fn() -> i64 + Send>) -> anyhow::Result<Daemon> {
         let mut daemon = Daemon {
             store,
+            attachments,
             clients: HashMap::new(),
             docs: HashMap::new(),
             dirty: HashMap::new(),
@@ -244,6 +251,22 @@ impl Daemon {
             "drafts.emptyTrash" => self.empty_trash(),
             "drafts.export" => self.export(params(p)?),
             "drafts.render" => self.render(params(p)?),
+            "attachments.add" => {
+                let proto::AddAttachmentParams { data } = params(p)?;
+                let bytes = B64.decode(data).map_err(|e| RpcError::invalid_params(format!("bad data: {e}")))?;
+                let name = self.attachments.add(&bytes).map_err(|e| match e {
+                    AddError::Io(e) => internal(e),
+                    e => RpcError::invalid_params(e.to_string()),
+                })?;
+                Ok(json!({ "name": name, "size": bytes.len() }))
+            }
+            "attachments.get" => {
+                let proto::AttachmentParams { name } = params(p)?;
+                match self.attachments.read(&name).map_err(internal)? {
+                    Some((kind, bytes)) => Ok(json!({ "name": name, "type": kind.mime(), "data": B64.encode(bytes) })),
+                    None => Err(RpcError::new(codes::NOT_FOUND, format!("no attachment {name}"))),
+                }
+            }
             "drafts.subscribe" | "drafts.unsubscribe" => {
                 if let Some(c) = self.clients.get_mut(&client) {
                     c.list_subscriber = method == "drafts.subscribe";
@@ -454,34 +477,45 @@ impl Daemon {
     }
 
     /// Writes every draft as markdown to a folder or a zip
-    /// (scratchpad_core::export). Open drafts come from memory, so the
-    /// export has the latest typing.
+    /// (scratchpad_core::export), or with `id`, one draft and its images.
+    /// Open drafts come from memory, so the export has the latest typing.
     fn export(&mut self, p: proto::ExportParams) -> Result<Value, RpcError> {
         let path = std::path::PathBuf::from(&p.path);
         if !path.is_absolute() {
             return Err(RpcError::invalid_params("the export path has to be absolute"));
         }
         self.flush_dirty(true);
-        let mut drafts = Vec::new();
-        for summary in self.store.all_summaries().map_err(internal)? {
-            let body = match self.docs.get(&summary.id) {
-                Some(open) => draft::body(&open.doc).to_string(),
-                None => match self.store.load_doc(&summary.id).map_err(internal)? {
-                    Some((doc, _)) => draft::body(&doc).to_string(),
-                    None => continue,
-                },
-            };
-            drafts.push((summary, body));
-        }
-        let entries =
-            scratchpad_core::export::entries(&drafts, self.now(), &format!("scratchpad {}", env!("CARGO_PKG_VERSION")));
+        let (entries, count) = match &p.id {
+            Some(id) => {
+                let id = self.resolve(id)?;
+                let body = draft::body(&self.load(&id)?.doc).to_string();
+                let summary =
+                    self.store.summary(&id).map_err(internal)?.ok_or_else(|| internal("draft not indexed"))?;
+                (scratchpad_core::export::draft_entries(&summary, &body, &self.attachments, self.now()), 1)
+            }
+            None => {
+                let mut drafts = Vec::new();
+                for summary in self.store.all_summaries().map_err(internal)? {
+                    let body = match self.docs.get(&summary.id) {
+                        Some(open) => draft::body(&open.doc).to_string(),
+                        None => match self.store.load_doc(&summary.id).map_err(internal)? {
+                            Some((doc, _)) => draft::body(&doc).to_string(),
+                            None => continue,
+                        },
+                    };
+                    drafts.push((summary, body));
+                }
+                let by = format!("scratchpad {}", env!("CARGO_PKG_VERSION"));
+                (scratchpad_core::export::entries(&drafts, &self.attachments, self.now(), &by), drafts.len())
+            }
+        };
         let written = if p.zip {
             scratchpad_core::export::write_zip(&entries, &path, p.overwrite)
         } else {
             scratchpad_core::export::write_dir(&entries, &path)
         };
         written.map_err(|e| RpcError::new(codes::INTERNAL, format!("{e:#}")))?;
-        Ok(json!({ "drafts": drafts.len(), "path": p.path }))
+        Ok(json!({ "drafts": count, "path": p.path }))
     }
 
     fn render(&mut self, p: proto::RenderParams) -> Result<Value, RpcError> {
@@ -493,7 +527,9 @@ impl Daemon {
             }
             (None, None) => return Err(RpcError::invalid_params("pass id or text")),
         };
-        Ok(json!({ "html": scratchpad_core::render::to_html(&markdown) }))
+        let store = &self.attachments;
+        let html = scratchpad_core::render::to_html_with(&markdown, |name| store.read(name).ok().flatten());
+        Ok(json!({ "html": html }))
     }
 
     /// Deletes a draft outright, leaving a tombstone.
@@ -629,6 +665,39 @@ impl Daemon {
             }
             Err(e) => eprintln!("scratchpadd: purge failed: {e}"),
         }
+        if let Err(e) = self.collect_attachments() {
+            eprintln!("scratchpadd: cleaning up attachments failed: {e:#}");
+        }
+    }
+
+    /// Deletes attachments no draft has used for ATTACHMENT_RETENTION_MS.
+    /// The first sweep that finds one unused notes the time; a later one
+    /// deletes it, unless a draft has started using it again.
+    fn collect_attachments(&mut self) -> anyhow::Result<()> {
+        let stored = self.attachments.list()?;
+        let orphans = self.store.attachment_orphans()?;
+        if stored.is_empty() && orphans.is_empty() {
+            return Ok(());
+        }
+        let bodies = self.store.all_bodies()?;
+        let used: HashSet<&str> = bodies.iter().flat_map(|b| attachments::references(b)).collect();
+        let now = self.now();
+        for name in &stored {
+            match (used.contains(name.as_str()), orphans.get(name)) {
+                (true, Some(_)) => self.store.clear_attachment_orphan(name)?,
+                (false, None) => self.store.set_attachment_orphan(name, now)?,
+                (false, Some(&since)) if now - since >= ATTACHMENT_RETENTION_MS => {
+                    self.attachments.remove(name)?;
+                    self.store.clear_attachment_orphan(name)?;
+                }
+                _ => {}
+            }
+        }
+        for name in orphans.keys().filter(|n| !stored.contains(n)) {
+            self.store.clear_attachment_orphan(name)?;
+        }
+        self.attachments.remove_partials();
+        Ok(())
     }
 }
 
@@ -643,6 +712,7 @@ mod tests {
         daemon: Daemon,
         clock: Arc<AtomicI64>,
         next_id: u64,
+        _dir: tempfile::TempDir,
     }
 
     struct TestClient {
@@ -654,9 +724,12 @@ mod tests {
         fn new() -> Harness {
             let clock = Arc::new(AtomicI64::new(1_000_000));
             let c = clock.clone();
+            let dir = tempfile::tempdir().unwrap();
+            let attachments = Attachments::new(dir.path().join("attachments"));
             let daemon =
-                Daemon::new(Store::open_in_memory().unwrap(), Box::new(move || c.load(Ordering::SeqCst))).unwrap();
-            Harness { daemon, clock, next_id: 0 }
+                Daemon::new(Store::open_in_memory().unwrap(), attachments, Box::new(move || c.load(Ordering::SeqCst)))
+                    .unwrap();
+            Harness { daemon, clock, next_id: 0, _dir: dir }
         }
 
         fn client(&mut self) -> TestClient {
@@ -1042,5 +1115,101 @@ mod tests {
         let mut c = h.client();
         let r = h.ok(&mut c, "drafts.render", json!({ "text": "**bold**" }));
         assert!(r["html"].as_str().unwrap().contains("<strong>bold</strong>"));
+    }
+
+    /// A 1×1 PNG.
+    const PIXEL: &str =
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNgYGBgAAAABQABeqhXUAAAAABJRU5ErkJggg==";
+
+    fn attach(h: &mut Harness, c: &mut TestClient, data: &str) -> String {
+        h.ok(c, "attachments.add", json!({ "data": data }))["name"].as_str().unwrap().to_string()
+    }
+
+    #[test]
+    fn attachments_are_stored_once_and_read_back() {
+        let mut h = Harness::new();
+        let mut c = h.client();
+        let name = attach(&mut h, &mut c, PIXEL);
+        assert!(name.ends_with(".png"));
+        assert_eq!(attach(&mut h, &mut c, PIXEL), name);
+        let got = h.ok(&mut c, "attachments.get", json!({ "name": name }));
+        assert_eq!((got["type"].as_str(), got["data"].as_str()), (Some("image/png"), Some(PIXEL)));
+
+        let bad = |h: &mut Harness, c: &mut TestClient, method: &str, params: Value| {
+            h.call(c, method, params).0.unwrap_err().code
+        };
+        assert_eq!(bad(&mut h, &mut c, "attachments.add", json!({ "data": "not base64!" })), codes::INVALID_PARAMS);
+        let svg = B64.encode("<svg xmlns='http://www.w3.org/2000/svg'/>");
+        assert_eq!(bad(&mut h, &mut c, "attachments.add", json!({ "data": svg })), codes::INVALID_PARAMS);
+        let missing = json!({ "name": "0123456789abcdef0123456789abcdef.png" });
+        assert_eq!(bad(&mut h, &mut c, "attachments.get", missing), codes::NOT_FOUND);
+        assert_eq!(bad(&mut h, &mut c, "attachments.get", json!({ "name": "../scratchpad.db" })), codes::NOT_FOUND);
+
+        let html = h.ok(&mut c, "drafts.render", json!({ "text": format!("![](attachment:{name})") }));
+        assert!(html["html"].as_str().unwrap().contains(&format!("data:image/png;base64,{PIXEL}")));
+    }
+
+    #[test]
+    fn unused_attachments_are_deleted_after_a_while() {
+        let mut h = Harness::new();
+        let mut c = h.client();
+        let kept = attach(&mut h, &mut c, PIXEL);
+        let dropped = attach(&mut h, &mut c, &B64.encode(b"GIF89a, not much of one"));
+        let id = h.ok(
+            &mut c,
+            "drafts.create",
+            json!({ "text": format!("![](attachment:{kept})\n![](attachment:{dropped})") }),
+        )["id"]
+            .clone();
+        let trashed = h.ok(&mut c, "drafts.create", json!({ "text": format!("![](attachment:{kept})") }))["id"].clone();
+        h.ok(&mut c, "drafts.setState", json!({ "id": trashed, "state": "trashed" }));
+        let stored = |h: &Harness| h.daemon.attachments.list().unwrap();
+
+        h.daemon.purge();
+        assert_eq!(stored(&h).len(), 2);
+        // Deleting the image line starts the clock...
+        h.ok(&mut c, "drafts.setText", json!({ "id": id, "text": "no images" }));
+        h.daemon.purge();
+        h.advance(ATTACHMENT_RETENTION_MS - 1);
+        h.daemon.purge();
+        assert_eq!(stored(&h).len(), 2, "not yet");
+        // ...and putting it back, as an undo would, stops it.
+        h.ok(&mut c, "drafts.setText", json!({ "id": id, "text": format!("![](attachment:{dropped})") }));
+        h.advance(1);
+        h.daemon.purge();
+        h.ok(&mut c, "drafts.setText", json!({ "id": id, "text": "gone again" }));
+        h.daemon.purge();
+        h.advance(ATTACHMENT_RETENTION_MS / 2);
+        h.daemon.purge();
+        assert_eq!(stored(&h).len(), 2, "the clock started over");
+        h.advance(ATTACHMENT_RETENTION_MS / 2);
+        h.daemon.purge();
+        // The trashed draft was purged on the way, and its image goes a
+        // retention period after that.
+        assert_eq!(stored(&h), std::slice::from_ref(&kept));
+        h.advance(ATTACHMENT_RETENTION_MS);
+        h.daemon.purge();
+        assert!(stored(&h).is_empty());
+        assert!(h.daemon.store.attachment_orphans().unwrap().is_empty());
+    }
+
+    #[test]
+    fn one_draft_exports_with_its_images() {
+        let mut h = Harness::new();
+        let mut c = h.client();
+        let name = attach(&mut h, &mut c, PIXEL);
+        let id = h.ok(&mut c, "drafts.create", json!({ "text": format!("# Shots\n\n![](attachment:{name})") }))["id"]
+            .clone();
+        h.ok(&mut c, "drafts.create", json!({ "text": "Another draft" }));
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("one");
+        let r = h.ok(&mut c, "drafts.export", json!({ "path": out.to_str().unwrap(), "id": id }));
+        assert_eq!(r["drafts"], 1);
+        assert_eq!(
+            std::fs::read_to_string(out.join("Shots.md")).unwrap(),
+            format!("# Shots\n\n![](attachments/{name})")
+        );
+        assert_eq!(B64.encode(std::fs::read(out.join("attachments").join(&name)).unwrap()), PIXEL);
+        assert_eq!(std::fs::read_dir(&out).unwrap().count(), 2, "just the draft and its images");
     }
 }

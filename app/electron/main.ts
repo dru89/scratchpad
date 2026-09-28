@@ -22,6 +22,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AppClient } from './daemon';
+import { attachmentsDir } from './paths';
 import { fileStem } from './filename';
 import { checkNow, restartToUpdate, startUpdates, updateReady, updatesEnabled } from './updates';
 import { StateStore, Windows } from './windows';
@@ -40,7 +41,12 @@ if (process.env.SCRATCHPAD_APP_STATE_DIR) app.setPath('userData', process.env.SC
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  // Pasted images, as drafts refer to them: attachment:<hash>.png.
+  { scheme: 'attachment', privileges: { secure: true, supportFetchAPI: true } },
 ]);
+
+/** An attachment's name (crates/core/src/attachments.rs); nothing else is looked up. */
+const ATTACHMENT_NAME = /^[0-9a-f]{32}\.(png|jpg|gif|webp)$/;
 
 /**
  * Opens a scratchpad:// link: scratchpad://open/<id> opens that draft in its
@@ -274,16 +280,25 @@ if (!app.requestSingleInstanceLock()) {
     if (response === 1) shell.showItemInFolder(filePath);
   }
 
-  /** Export…: one draft as a .md file, named from its title and dated like it. */
+  /**
+   * Export…: one draft as a .md file, named from its title and dated like
+   * it. A draft with images is a zip of the .md and an attachments folder,
+   * which the daemon writes.
+   */
   async function exportDraft(id: string, parent?: BrowserWindow | null): Promise<string | null> {
-    const draft = await daemon.call<{ title: string; text: string; modifiedAt: number }>('drafts.get', { id });
+    const draft = await daemon.call<{ id: string; title: string; text: string; modifiedAt: number }>('drafts.get', { id });
+    const images = /attachment:[0-9a-f]{32}\./.test(draft.text);
     const options: Electron.SaveDialogOptions = {
       title: 'Export Draft',
-      defaultPath: join(app.getPath('documents'), `${fileStem(draft.title)}.md`),
-      filters: [{ name: 'Markdown', extensions: ['md'] }],
+      defaultPath: join(app.getPath('documents'), `${fileStem(draft.title)}.${images ? 'zip' : 'md'}`),
+      filters: [images ? { name: 'Zip archive', extensions: ['zip'] } : { name: 'Markdown', extensions: ['md'] }],
     };
     const { canceled, filePath } = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options);
     if (canceled || !filePath) return null;
+    if (images) {
+      await daemon.call('drafts.export', { path: filePath, zip: true, overwrite: true, id: draft.id });
+      return filePath;
+    }
     await writeFile(filePath, draft.text);
     const modified = new Date(draft.modifiedAt);
     await utimes(filePath, modified, modified);
@@ -328,6 +343,16 @@ if (!app.requestSingleInstanceLock()) {
       const file = join(RENDERER, decodeURIComponent(new URL(req.url).pathname));
       if (!file.startsWith(RENDERER)) return new Response('forbidden', { status: 403 });
       return net.fetch(pathToFileURL(file).toString());
+    });
+    // Read straight from the daemon's folder, since windows only show them.
+    protocol.handle('attachment', async (req) => {
+      const name = new URL(req.url).pathname;
+      if (!ATTACHMENT_NAME.test(name)) return new Response('not an attachment', { status: 400 });
+      try {
+        return await net.fetch(pathToFileURL(join(attachmentsDir(), name)).toString());
+      } catch {
+        return new Response('not found', { status: 404 });
+      }
     });
 
     state = new StateStore();

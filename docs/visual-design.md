@@ -52,6 +52,8 @@ Rhythm is where most of the calm comes from:
 - The selection is `--selection`, drawn over the text rather than under it, so code and inline code backgrounds can't hide it ([`editor/selection.ts`](../app/src/editor/selection.ts)). Each line's piece ends at its text, and a selected line break is a short block after it, so a triple-clicked line reads as that line alone. There's no caret while text is selected.
 - A tab is about three monospaced characters wide in prose and four in code.
 
+A pasted image on a line of its own shows at its own size, no wider than the text and no taller than `--image-max-height` (26em), with square-ish `--radius-sm` corners and a 1px `--line` hairline so a white screenshot doesn't melt into the paper. On the line being edited its markdown shows above it, in `--ink-3` like any revealed syntax, and the picture stays where it was. An image that's gone shows as a dashed `--line-strong` box saying so. If storing a pasted image takes long enough to notice, "Adding image…" fades in where it will go.
+
 The text column is `--measure` (40em including side padding, about 70 characters). The capture window sets it to `none` and uses its width.
 
 Line classes come from [`editor/livepreview.ts`](../app/src/editor/livepreview.ts) and inline classes from the HighlightStyle in [`editor/setup.ts`](../app/src/editor/setup.ts):
@@ -64,6 +66,7 @@ Line classes come from [`editor/livepreview.ts`](../app/src/editor/livepreview.t
 | `.cm-strong`, `.cm-em`, `.cm-strike`, `.cm-inline-code`, `.cm-link`, `.cm-url`, `.cm-mark` | HighlightStyle in setup.ts |
 | `.cm-code-keyword`, `-string`, `-number`, `-type`, `-comment`, `-function`, `-quiet` | HighlightStyle in setup.ts, for code in fenced blocks |
 | `.cm-table-wrap`, and `.cm-searchMatch` in its cells while find is open | the table widget in tables.ts |
+| `.cm-image` (+ `.cm-image-missing` inside), `.cm-image-pending`, and `.cm-image-source` on the line being edited | the image widgets and line decoration in images.ts |
 
 Two CodeMirror rules to keep in mind. CodeMirror mounts its own styles after `style.css`, so rules for line classes are written `.cm-editor .cm-line.cm-x` to outrank its default line padding, and anything else that fights its base theme goes in `EditorView.theme` in setup.ts. And use padding, never margins, on lines: CodeMirror measures line boxes, and margins throw that off.
 

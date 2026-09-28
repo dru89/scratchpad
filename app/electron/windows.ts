@@ -162,6 +162,10 @@ export class Windows {
       if (kind === 'draft' && draftId) this.drafts.delete(draftId);
     });
 
+    // A file dropped anywhere the editor doesn't take it would otherwise
+    // replace the page.
+    win.webContents.on('will-navigate', (e) => e.preventDefault());
+
     const query = new URLSearchParams({ kind, ...(draftId ? { draft: draftId } : {}) });
     void win.loadURL(`app://scratchpad/index.html?${query}`);
     return m;
