@@ -242,9 +242,20 @@ pub struct DocPushParams {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CaptureParams {
-    /// "summon" (apply the idle rule) or "new" (always a fresh draft).
+    /// "summon" (apply the idle rule), "new" (always a fresh draft), or
+    /// "toggle" (summon, or hide the window if it's the one in use).
     pub mode: Option<String>,
     pub draft_id: Option<String>,
+    /// Forwarded so the app can take focus on Wayland.
+    pub activation_token: Option<String>,
+}
+
+/// ui.main: show the main window, or with `toggle`, hide it if it's the
+/// window in use.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MainWindowParams {
+    pub toggle: bool,
     /// Forwarded so the app can take focus on Wayland.
     pub activation_token: Option<String>,
 }

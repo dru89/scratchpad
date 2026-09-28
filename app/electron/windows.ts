@@ -109,6 +109,12 @@ export class Windows {
       show,
       title: kind === 'capture' ? 'Capture — scratchpad' : 'scratchpad',
       autoHideMenuBar: true,
+      // On macOS the capture window is a panel, like Spotlight's: it takes
+      // the keyboard without making scratchpad the active app, so the main
+      // window stays behind whatever you were using, and closing the panel
+      // puts you back there. Panels also come up over full-screen apps and
+      // on every Space.
+      ...(isMac && kind === 'capture' ? { type: 'panel' } : {}),
       webPreferences: {
         preload: join(__dirname, 'preload.js'),
         contextIsolation: true,
@@ -117,9 +123,6 @@ export class Windows {
         backgroundThrottling: kind !== 'capture',
       },
     });
-    // On macOS the capture window can come up over a full-screen app, as a
-    // panel does. Set once here: each call briefly hides the Dock icon.
-    if (isMac && kind === 'capture') win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     const m: Managed = { win, kind, key, link: null };
     const contentsId = win.webContents.id;
     this.byContents.set(contentsId, m);
@@ -175,16 +178,32 @@ export class Windows {
     if (!this.capture) this.capture = this.create('capture', undefined, false);
   }
 
-  showMain() {
+  /** Shows the main window, or with `toggle`, hides it if it's the window in use. */
+  showMain({ toggle = false } = {}) {
+    if (toggle && this.inUse(this.main)) return this.hide(this.main!);
     if (!this.main || this.main.win.isDestroyed()) this.main = this.create('main');
     this.present(this.main);
   }
 
+  /**
+   * Summons the capture window. Mode "toggle" is the hotkey's: it hides the
+   * window if it's the one in use, and otherwise summons it, idle rule and
+   * pin included.
+   */
   showCapture(params: { mode?: string; draftId?: string }) {
+    if (params.mode === 'toggle') {
+      if (this.inUse(this.capture)) return this.hide(this.capture!);
+      params = { ...params, mode: 'summon' };
+    }
     this.createCapture();
     const m = this.capture!;
     m.win.webContents.send('win:summon', params);
     this.present(m);
+  }
+
+  /** Showing and focused: the window a toggle hides rather than summons. */
+  private inUse(m: Managed | null) {
+    return !!m && !m.win.isDestroyed() && m.win.isVisible() && m.win.isFocused();
   }
 
   openDraft(id: string) {
@@ -210,13 +229,16 @@ export class Windows {
   }
 
   /**
-   * Shows and focuses a window. On KDE Wayland, KWin has to do the focusing;
-   * on macOS, the app has to be brought forward from behind the one in use.
+   * Shows and focuses a window. On KDE Wayland, KWin has to do the focusing.
+   * On macOS, the app has to be brought forward from behind the one in use,
+   * except for the capture panel, which takes focus without it; a hidden
+   * app still has to be unhidden first.
    */
   private present(m: Managed) {
-    if (isMac) app.show();
+    const panel = isMac && m.kind === 'capture';
+    if (isMac && (!panel || app.isHidden())) app.show();
     m.win.show();
-    if (isMac) app.focus({ steal: true });
+    if (isMac && !panel) app.focus({ steal: true });
     m.win.focus();
     if (useKwin()) {
       setTimeout(() => {

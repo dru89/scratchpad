@@ -122,8 +122,9 @@ Every `id` parameter accepts a full id or any unique prefix of one, case-insensi
 | `doc.open` | `id`, `version?` (a version vector) | A snapshot, or the updates since `version`, plus the daemon's version vector. Starts `doc.update {id, update}` notifications for that draft. One task handles every request in order, so the reply always reaches the client before any update for that draft. |
 | `doc.push` | `id`, `update` | Applies a Loro update from an editor window and relays it to the draft's other windows. Updates the daemon already has are ignored. |
 | `doc.close` | `id` | Stops updates. A deleted draft's windows get `doc.removed {id}`. |
-| `ui.capture` | `mode?: "summon" \| "new"`, `draftId?`, `activationToken?` | Forwarded to the app. Until the app exists this fails with "the app isn't running"; later the daemon will launch it. |
+| `ui.capture` | `mode?: "summon" \| "new" \| "toggle"`, `draftId?`, `activationToken?` | Forwarded to the app. `toggle` summons the capture window, or hides it if it's the focused window. With no app connected this fails with "the app isn't running", and the CLI starts it. |
 | `ui.open` | `id` | Opens the draft in its own window. |
+| `ui.main` | `toggle?`, `activationToken?` | Shows the main window, or with `toggle`, hides it if it's the focused window. |
 | `daemon.status` | | Version, pid, uptime, counts of clients, loaded drafts and drafts. |
 | `daemon.shutdown` | | Replies, then exits. |
 
@@ -167,7 +168,7 @@ Window state (current draft, pinned, when the draft was loaded, float) is local 
 
 | action | Linux | macOS | effect |
 | --- | --- | --- | --- |
-| Summon | Meta+Shift+2 | Cmd+Shift+2 | Shows the capture window and applies the idle rule. |
+| Summon | Meta+Shift+2 | Cmd+Shift+2 | Shows the capture window and applies the idle rule. When the capture window is already the focused window, the same keys hide it. |
 | New draft | Ctrl+N | Cmd+N | Starts a new empty draft now. The window stays open. Also works in the main window. |
 | Done | Ctrl+Enter | Cmd+Enter | Keeps the draft in the Inbox, clears and hides the window. The next summon starts fresh regardless of the timer. |
 | Load a draft | Ctrl+K | Cmd+K | The quick switcher, opened from the capture window, loads the chosen draft into it and restarts the idle timer. Also available as "Open in capture window" from the sidebar, and as `scratchpad capture --draft <id>`. |
@@ -195,16 +196,16 @@ Ctrl on Linux, Cmd on macOS.
 
 Archiving or trashing from the main or capture window moves that window on to a new draft; a draft's own window stays on it and shows a badge.
 
-Closing the main or capture window hides it, so the app keeps running for the hotkey; Ctrl+Q quits. Launching the app again shows the main window.
+Closing the main or capture window hides it, so the app keeps running for the hotkey; Ctrl+Q quits. Launching the app again shows the main window, and so does Meta+Shift+1 (Cmd+Shift+1 on macOS) from anywhere, which hides it again when it's the focused window.
 
 **The Draft menu** in the menu bar has these actions for the focused window's draft, plus Duplicate and a Copy submenu (Contents, Title, Link, ID). The sidebar's context menu has the same for any draft: open in a new or the capture window, archive or trash, Duplicate, Get Info, Copy (Contents, Rich Text, Title, Link, ID), and on the Trash tab, Empty Trash. Duplicate makes a new Inbox draft with the same text and opens it. The window carries out every action, so the keys and the menu go through the same code; on macOS the menu takes the keys, and on Linux it only shows them.
 
 **Links.** `scratchpad://open/<id>` opens a draft in its own window, and `scratchpad://capture` summons the capture window. The CLI's `--json` output and the MCP results include each draft's link as `url`, and `scratchpad link <id>` prints one. macOS registers the scheme from the app bundle and delivers links through `open-url`; on Linux the install script makes the desktop entry the handler, and links arrive on the command line.
 
-**Hotkey plumbing.**
-- On Linux, a KDE custom command runs `scratchpad capture`, which reaches the app through the daemon. KDE's portal-based global shortcuts are unreliable on this Plasma version; a custom command doesn't use the portal. The app then focuses the window through KWin, since Wayland won't let it take focus itself.
-- If the app isn't running, `scratchpad capture` (and `scratchpad open`) start it with `scratchpad-app --capture` (or `--open=<id>`).
-- On macOS, the app registers Cmd+Shift+2 itself with Electron's `globalShortcut` and starts at login (the app menu's Open at Login turns that off). The capture window can come up over a full-screen app, and hiding it with nothing else open hides the app, so focus goes back to where you were typing.
+**Hotkey plumbing.** Both hotkeys toggle: each shows its window, or hides it when it's the focused window. A window that's showing but not focused, like a floating capture window you've typed past, comes forward instead.
+- On Linux, KDE custom commands run `scratchpad capture --toggle` and `scratchpad open --toggle`, which reach the app through the daemon. KDE's portal-based global shortcuts are unreliable on this Plasma version; a custom command doesn't use the portal. The app then focuses the window through KWin, since Wayland won't let it take focus itself.
+- If the app isn't running, `scratchpad capture` (and `scratchpad open`) start it with `scratchpad-app --capture` (or `--open=<id>`, or nothing for the main window).
+- On macOS, the app registers Cmd+Shift+1 and Cmd+Shift+2 itself with Electron's `globalShortcut` and starts at login (the app menu's Open at Login turns that off). The capture window is a panel (`type: 'panel'`), like Spotlight's: it takes the keyboard without making scratchpad the active app, so the main window stays behind whatever you were using, and hiding the panel puts you back there. It also comes up over full-screen apps and on every Space. When scratchpad is hidden, which happens when its last window closes so focus can go back where it was, summoning the panel unhides the app first.
 - `scratchpad capture` works everywhere, so Raycast, Keyboard Maestro or an agent can summon the window too.
 
 **Float.** The capture window floats by default, and any window can toggle it. On KDE that runs the KWin script from the shell test; on macOS it's `setAlwaysOnTop`.

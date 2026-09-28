@@ -295,6 +295,10 @@ impl Daemon {
                 let id = self.resolve(&id)?;
                 self.forward_to_app("ui.open", json!({ "id": id }))
             }
+            "ui.main" => {
+                let p: proto::MainWindowParams = params(p)?;
+                self.forward_to_app("ui.main", serde_json::to_value(p).unwrap())
+            }
             _ => Err(RpcError::new(codes::METHOD_NOT_FOUND, format!("unknown method {method}"))),
         }
     }
@@ -1092,6 +1096,9 @@ mod tests {
         let notes = drain(&mut app);
         assert_eq!(notes[0]["method"], "ui.capture");
         assert_eq!(notes[0]["params"]["mode"], "new");
+        h.ok(&mut cli, "ui.main", json!({ "toggle": true }));
+        let notes = drain(&mut app);
+        assert_eq!((&notes[0]["method"], &notes[0]["params"]["toggle"]), (&json!("ui.main"), &json!(true)));
         h.daemon.disconnect(app.id);
         assert_eq!(h.call(&mut cli, "ui.capture", json!({})).0.unwrap_err().code, codes::NO_APP);
     }

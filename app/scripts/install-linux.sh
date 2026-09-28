@@ -7,9 +7,13 @@
 #                                     opens scratchpad:// links
 #   icons/hicolor/…/apps/…scratchpad.png  the app icon, at each size
 #   autostart/…scratchpad.desktop     starts it in the background at login
+#   applications/net.local.scratchpad-main.desktop
+#                                     a command that shows or hides the main
+#                                     window, with Meta+Shift+1 as its
+#                                     default shortcut
 #   applications/net.local.scratchpad-capture.desktop
-#                                     a "scratchpad capture" command with
-#                                     Meta+Shift+2 as its default shortcut
+#                                     the same for the capture window, with
+#                                     Meta+Shift+2
 #
 #   install-linux.sh [--no-autostart] [--uninstall]
 #
@@ -24,6 +28,7 @@ apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 autostart_dir="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
 app_entry="$apps/dev.unremarkable.scratchpad.desktop"
 autostart_entry="$autostart_dir/dev.unremarkable.scratchpad.desktop"
+main_entry="$apps/net.local.scratchpad-main.desktop"
 capture_entry="$apps/net.local.scratchpad-capture.desktop"
 icons="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
 icon_name=dev.unremarkable.scratchpad
@@ -33,7 +38,7 @@ for arg in "$@"; do
   case $arg in
     --no-autostart) autostart=0 ;;
     --uninstall)
-      rm -f "$bin/scratchpad-app" "$app_entry" "$autostart_entry" "$capture_entry"
+      rm -f "$bin/scratchpad-app" "$app_entry" "$autostart_entry" "$main_entry" "$capture_entry"
       rm -f "$icons"/*/apps/$icon_name.png
       # The scratchpad:// association in mimeapps.list points at the removed
       # entry now, which is harmless; xdg-mime has no way to unset it.
@@ -86,11 +91,23 @@ else
   rm -f "$autostart_entry"
 fi
 
+# The hotkeys: each shows its window, or hides it if it's the one in use.
+cat >"$main_entry" <<EOF
+[Desktop Entry]
+Type=Application
+Name=scratchpad main window
+Exec=$cli open --toggle
+NoDisplay=true
+StartupNotify=false
+X-KDE-GlobalAccel-CommandShortcut=true
+X-KDE-Shortcuts=Meta+Shift+1
+EOF
+
 cat >"$capture_entry" <<EOF
 [Desktop Entry]
 Type=Application
 Name=scratchpad capture
-Exec=$cli capture
+Exec=$cli capture --toggle
 NoDisplay=true
 StartupNotify=false
 X-KDE-GlobalAccel-CommandShortcut=true
@@ -104,10 +121,12 @@ Installed:
   $bin/scratchpad-app
   $app_entry
   $( [[ $autostart == 1 ]] && echo "$autostart_entry (starts in the background at login)" || echo "(no autostart)")
+  $main_entry
   $capture_entry
 
 One manual step: open System Settings > Keyboard > Shortcuts, find
-"scratchpad capture" under Custom Commands (or search for it), and make sure
-it's bound to Meta+Shift+2. KDE only applies a default shortcut the first time
-it sees a command, so this is the reliable way to set it.
+"scratchpad main window" and "scratchpad capture" under Custom Commands (or
+search for them), and make sure they're bound to Meta+Shift+1 and
+Meta+Shift+2. KDE only applies a default shortcut the first time it sees a
+command, so this is the reliable way to set them.
 EOF

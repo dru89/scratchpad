@@ -66,7 +66,7 @@ cd app && npm install && npm run build
 scripts/install-linux.sh
 ```
 
-The install script adds scratchpad to your application launcher and starts it in the background when you log in (pass `--no-autostart` to skip that). On KDE it also sets Meta+Shift+2 to open the capture window; confirm that once in System Settings > Keyboard > Shortcuts. On other desktops, bind a shortcut to `scratchpad capture`. `scripts/install-linux.sh --uninstall` removes it all.
+The install script adds scratchpad to your application launcher and starts it in the background when you log in (pass `--no-autostart` to skip that). On KDE it also sets Meta+Shift+2 for the capture window and Meta+Shift+1 for the main window; confirm them once in System Settings > Keyboard > Shortcuts. On other desktops, bind shortcuts to `scratchpad capture --toggle` and `scratchpad open --toggle`. `scripts/install-linux.sh --uninstall` removes it all.
 
 To update, run `scripts/update-linux.sh` from `app/`. It pulls, reinstalls the daemon and CLI, rebuilds the app and restarts it in the background.
 
@@ -74,7 +74,8 @@ To update, run `scripts/update-linux.sh` from `app/`. It pulls, reinstalls the d
 
 | action | macOS | Linux |
 | --- | --- | --- |
-| Capture from anywhere | ⌘⇧2 | Meta+Shift+2 |
+| Capture from anywhere, or hide the capture window | ⌘⇧2 | Meta+Shift+2 |
+| Show the main window from anywhere, or hide it | ⌘⇧1 | Meta+Shift+1 |
 | New draft | ⌘N | Ctrl+N |
 | Done: file it and start fresh | ⌘↩ | Ctrl+Enter |
 | Quick switcher | ⌘K | Ctrl+K |
@@ -92,7 +93,7 @@ To update, run `scripts/update-linux.sh` from `app/`. It pulls, reinstalls the d
 | Nest a list item, or move it back out | Tab, ⇧Tab | Tab, Shift+Tab |
 | Hide the capture window | Esc | Esc |
 
-Closing the main window keeps scratchpad running for the hotkey. Quit from the menu, or with ⌘Q (Ctrl+Q on Linux).
+The two global shortcuts show their window, or hide it when it's the window you're using. Closing the main window keeps scratchpad running for the hotkeys. Quit from the menu, or with ⌘Q (Ctrl+Q on Linux).
 
 ## Command line and agents
 
@@ -107,6 +108,7 @@ scratchpad archive 01M3F9ZX7F            # also trash and restore
 scratchpad link 01M3F9ZX7F               # the scratchpad:// link that opens it in the app
 scratchpad export ~/scratchpad-backup    # every draft as markdown; --zip for a single file
 scratchpad capture                       # open the capture window, from Raycast, a script or anything else
+scratchpad open                          # the main window; --toggle hides it if it's in use, as capture --toggle does
 ```
 
 Any unique prefix of a draft's id works, and `--json` gives machine-readable output, including each draft's link.

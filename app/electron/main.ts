@@ -31,10 +31,13 @@ const IDLE_MS = Number(process.env.SCRATCHPAD_IDLE_MS) || 15 * 60 * 1000;
 const RENDERER = join(__dirname, '..', 'dist-renderer');
 const isMac = process.platform === 'darwin';
 /**
- * The capture hotkey on macOS, where an app can register one itself. On
- * Linux it's a desktop shortcut that runs `scratchpad capture`
- * (app/scripts/install-linux.sh), because Wayland doesn't let apps grab keys.
+ * The hotkeys on macOS, where an app can register them itself. Each shows
+ * its window, or hides it if it's the window in use. On Linux they're
+ * desktop shortcuts that run `scratchpad open --toggle` and `scratchpad
+ * capture --toggle` (app/scripts/install-linux.sh), because Wayland doesn't
+ * let apps grab keys.
  */
+const MAIN_HOTKEY = 'Command+Shift+1';
 const CAPTURE_HOTKEY = 'Command+Shift+2';
 
 if (process.env.SCRATCHPAD_APP_STATE_DIR) app.setPath('userData', process.env.SCRATCHPAD_APP_STATE_DIR);
@@ -74,7 +77,8 @@ function summon(windows: Windows, argv: string[]) {
     for (const link of links) openLink(windows, link);
   } else if (argv.includes('--capture')) {
     const draftId = value('--draft');
-    windows.showCapture({ mode: argv.includes('--new') ? 'new' : draftId ? 'load' : 'summon', draftId });
+    const mode = argv.includes('--new') ? 'new' : draftId ? 'load' : argv.includes('--toggle') ? 'toggle' : 'summon';
+    windows.showCapture({ mode, draftId });
   } else if (value('--open')) {
     windows.openDraft(value('--open')!);
   } else if (!argv.includes('--background')) {
@@ -365,8 +369,12 @@ if (!app.requestSingleInstanceLock()) {
     for (const link of pendingLinks.splice(0)) openLink(windows, link);
 
     if (isMac) {
-      if (!globalShortcut.register(CAPTURE_HOTKEY, () => windows.showCapture({ mode: 'summon' }))) {
-        console.error(`scratchpad: couldn't register ${CAPTURE_HOTKEY}; another app may have it`);
+      const hotkeys: [string, () => void][] = [
+        [MAIN_HOTKEY, () => windows.showMain({ toggle: true })],
+        [CAPTURE_HOTKEY, () => windows.showCapture({ mode: 'toggle' })],
+      ];
+      for (const [keys, run] of hotkeys) {
+        if (!globalShortcut.register(keys, run)) console.error(`scratchpad: couldn't register ${keys}; another app may have it`);
       }
       // The hotkey only works while the app runs, so it starts at login
       // unless you've turned that off. Not for test runs, which set their
@@ -380,6 +388,7 @@ if (!app.requestSingleInstanceLock()) {
     daemon = new AppClient();
     daemon.on('ui.capture', (p) => windows.showCapture(p ?? {}));
     daemon.on('ui.open', (p) => p?.id && windows.openDraft(p.id));
+    daemon.on('ui.main', (p) => windows.showMain({ toggle: !!p?.toggle }));
 
     Menu.setApplicationMenu(buildMenu(menuHandlers));
     startUpdates(() => Menu.setApplicationMenu(buildMenu(menuHandlers)));

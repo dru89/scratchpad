@@ -78,9 +78,19 @@ enum Cmd {
         /// Load this draft into the capture window.
         #[arg(long)]
         draft: Option<String>,
+        /// Hide the capture window instead if it's the window in use, for
+        /// binding to a hotkey.
+        #[arg(long, conflicts_with_all = ["new", "draft"])]
+        toggle: bool,
     },
-    /// Open a draft in its own app window.
-    Open { id: String },
+    /// Open a draft in its own app window, or with no id, the main window.
+    Open {
+        id: Option<String>,
+        /// Hide the main window instead if it's the window in use, for
+        /// binding to a hotkey.
+        #[arg(long, conflicts_with = "id")]
+        toggle: bool,
+    },
     /// Print a draft's link, which opens it in the app.
     Link { id: String },
     /// Export every draft as markdown: Inbox, Archive and Trash folders of
@@ -249,9 +259,9 @@ async fn run(cli: Cli) -> Result<()> {
             let v: Value = c.call("drafts.render", json!({ "id": id })).await?;
             print!("{}", v["html"].as_str().unwrap_or(""));
         }
-        Cmd::Capture { new, draft } => {
+        Cmd::Capture { new, draft, toggle } => {
             let params = json!({
-                "mode": if new { "new" } else { "summon" },
+                "mode": if new { "new" } else if toggle { "toggle" } else { "summon" },
                 "draftId": draft,
                 "activationToken": std::env::var("XDG_ACTIVATION_TOKEN").ok(),
             });
@@ -269,7 +279,16 @@ async fn run(cli: Cli) -> Result<()> {
                 launch_app(&args)?;
             }
         }
-        Cmd::Open { id } => {
+        Cmd::Open { id: None, toggle } => {
+            let params = json!({ "toggle": toggle, "activationToken": std::env::var("XDG_ACTIVATION_TOKEN").ok() });
+            if let Err(e) = c.call::<Value>("ui.main", params).await {
+                if !is_no_app(&e) {
+                    return Err(e);
+                }
+                launch_app(&[])?;
+            }
+        }
+        Cmd::Open { id: Some(id), .. } => {
             if let Err(e) = c.call::<Value>("ui.open", json!({ "id": id })).await {
                 if !is_no_app(&e) {
                     return Err(e);

@@ -43,6 +43,12 @@ async function isVisible(kind: string): Promise<boolean> {
   }, kind);
 }
 
+async function isFocused(kind: string): Promise<boolean> {
+  return app.evaluate(({ BrowserWindow }, kind) => {
+    return BrowserWindow.getAllWindows().some((w) => w.webContents.getURL().includes(`kind=${kind}`) && w.isFocused());
+  }, kind);
+}
+
 function editorText(page: Page) {
   return page.locator('.cm-content').innerText();
 }
@@ -456,5 +462,20 @@ test.describe.serial('scratchpad app', () => {
     await expect.poll(() => existsSync(zip)).toBe(true);
     const listing = execFileSync('unzip', ['-Z1', zip], { encoding: 'utf8' }).trim().split('\n');
     expect(listing.sort()).toEqual(['Screenshot.md', `attachments/${name}`]);
+  });
+
+  test('the hotkeys show a window, or hide it when it is the one in use', async () => {
+    // What the Linux shortcuts run; the macOS hotkeys call the same code.
+    run('capture', '--toggle');
+    await expect.poll(() => isFocused('capture')).toBe(true);
+    run('capture', '--toggle');
+    await expect.poll(() => isVisible('capture')).toBe(false);
+
+    run('open');
+    await expect.poll(() => isFocused('main')).toBe(true);
+    run('open', '--toggle');
+    await expect.poll(() => isVisible('main')).toBe(false);
+    run('open', '--toggle');
+    await expect.poll(() => isFocused('main')).toBe(true);
   });
 });
