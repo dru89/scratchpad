@@ -168,7 +168,14 @@ function buildMenu(handlers: MenuHandlers): Menu {
   // which only reverts this window's edits.
   const edit: MenuItemConstructorOptions = {
     label: 'Edit',
-    submenu: [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }],
+    submenu: [
+      { role: 'cut' },
+      { role: 'copy' },
+      { role: 'paste' },
+      // Plain text, where pasting would turn formatting into markdown.
+      { role: 'pasteAndMatchStyle', ...(isMac ? {} : { label: 'Paste as Plain Text' }) },
+      { role: 'selectAll' },
+    ],
   };
   const view: MenuItemConstructorOptions = {
     label: 'View',
@@ -436,7 +443,11 @@ if (!app.requestSingleInstanceLock()) {
     });
     ipcMain.handle('clipboard:copyRich', async (_e, markdown: string) => {
       const { html } = await daemon.call<{ html: string }>('drafts.render', { text: markdown });
-      await clipboard.write([new ClipboardItem({ 'text/html': html, 'text/plain': markdown })]);
+      // Marked as scratchpad's, so pasting it into a draft takes the markdown
+      // as it is instead of converting the HTML back (OWN_HTML in
+      // src/editor/richpaste.ts).
+      const own = `<meta name="generator" content="scratchpad">${html}`;
+      await clipboard.write([new ClipboardItem({ 'text/html': own, 'text/plain': markdown })]);
     });
     ipcMain.handle('clipboard:copyText', (_e, text: string) => clipboard.writeText(text));
     ipcMain.handle('app:emptyTrash', (e) => emptyTrash(BrowserWindow.fromWebContents(e.sender)));

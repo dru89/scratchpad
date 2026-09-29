@@ -13,6 +13,7 @@ Where scratchpad stands and what comes next. [`design.md`](design.md) covers how
 7. **Sidebar previews.** Each row shows two lines of the text after the title, and the sidebar resizes.
 8. **Export.** Every draft as markdown in a zip or folder, with a manifest; one draft as a `.md` file.
 9. **Pasted images.** Pasted and dropped images are stored once beside the drafts and shown in place, and they go along in exports, rich copy and to agents ([`design.md`](design.md#attachments)).
+10. **Global hotkeys that toggle, and pasting formatted text.** ⌘⇧1 and ⌘⇧2 show or hide the main and capture windows, the capture window is a panel on macOS, and pasted HTML becomes markdown ([`design.md`](design.md#pasting)).
 
 ## Next
 
@@ -29,6 +30,7 @@ Where scratchpad stands and what comes next. [`design.md`](design.md) covers how
 - Linux packages (AppImage or pacman) with updates, instead of building from source, and capture-hotkey setup for desktops other than KDE.
 - Designs with a place already reserved ([`visual-design.md`](visual-design.md#room-left-for-later)): a sync status indicator, sort options, an actions menu for a draft, and possibly tags or saved searches. None of them should grow into folders.
 - Search qualifiers like `in:archive`.
+- Images embedded in pasted HTML (as `data:` URLs) stored as attachments instead of left out.
 - More for images: showing an image that shares a line with text, showing a Retina screenshot at the size it was on screen, Copy Image and dragging one out, a TextBundle export for apps that read it, and a way for the CLI and agents to add one.
 - Icon polish: a hand-hinted 16px icon, and Apple's layered icon format if macOS ever shows ours inside a grey rounded square.
 - The long-term macOS shell, which [`decisions.md`](decisions.md) leaves open until the iPhone app exists.

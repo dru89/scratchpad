@@ -83,6 +83,19 @@ const tasks = [false, true].map((done) => Decoration.replace({ widget: new TaskW
 /** The [ ] or [x] shown as text on the line being edited, which clicks toggle too. */
 const rawTask = Decoration.mark({ class: 'cm-task-raw' });
 
+/** Whether `pos` is inside a node named in `names`, looking to either side of it. */
+export function insideNode(state: EditorState, pos: number, names: Set<string>): boolean {
+  for (const side of [-1, 1] as const) {
+    let node = syntaxTree(state).resolveInner(pos, side);
+    for (;;) {
+      if (names.has(node.name)) return true;
+      if (!node.parent) break;
+      node = node.parent;
+    }
+  }
+  return false;
+}
+
 export function touches(state: EditorState, from: number, to: number): boolean {
   for (const r of state.selection.ranges) {
     // A selection that ends where a line starts, like a triple-clicked

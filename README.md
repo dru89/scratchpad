@@ -26,6 +26,8 @@ It's inspired by [Drafts](https://getdrafts.com), and it runs on macOS and Linux
   <img alt="The capture window, pinned and floating on top, with Done at the bottom right" src="docs/images/capture-light.png" width="560">
 </picture>
 
+**Paste anything.** Formatted text from Google Docs, Word, Slack or a web page pastes as markdown, so its headings, bold, links, lists and tables come along. Paste and Match Style pastes the plain text instead.
+
 **Images.** Paste a screenshot or drop an image file and it shows in the draft. The markdown holds a reference to it, and the picture itself is stored once beside your drafts, however many drafts use it.
 
 **Copy as rich text.** One shortcut puts the draft on the clipboard as formatted text, images included, with the markdown alongside, so pasting into Slack, email or a document keeps the formatting.
@@ -91,6 +93,7 @@ To update, run `scripts/update-linux.sh` from `app/`. It pulls, reinstalls the d
 | Filter the sidebar | ⇧⌘L | Ctrl+Shift+L |
 | Find, and find and replace | ⌘F, ⌥⌘F | Ctrl+F, Ctrl+H |
 | Nest a list item, or move it back out | Tab, ⇧Tab | Tab, Shift+Tab |
+| Paste without formatting | ⌥⇧⌘V | Ctrl+Shift+V |
 | Hide the capture window | Esc | Esc |
 
 The two global shortcuts show their window, or hide it when it's the window you're using. Closing the main window keeps scratchpad running for the hotkeys. Quit from the menu, or with ⌘Q (Ctrl+Q on Linux).

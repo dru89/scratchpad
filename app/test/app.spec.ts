@@ -72,6 +72,16 @@ async function pasteImage(page: Page, base64: string, text?: string) {
   );
 }
 
+/** Pastes clipboard contents, such as text/html and text/plain, into the editor. */
+async function pasteData(page: Page, data: Record<string, string>) {
+  await page.evaluate((data) => {
+    const transfer = new DataTransfer();
+    for (const [type, value] of Object.entries(data)) transfer.setData(type, value);
+    const content = document.querySelector('.cm-content')!;
+    content.dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }));
+  }, data);
+}
+
 async function shot(page: Page, name: string) {
   if (shots) await page.screenshot({ path: join(shots, `${name}.png`) });
 }
@@ -477,5 +487,60 @@ test.describe.serial('scratchpad app', () => {
     await expect.poll(() => isVisible('main')).toBe(false);
     run('open', '--toggle');
     await expect.poll(() => isFocused('main')).toBe(true);
+  });
+
+  test('pasting formatted text writes markdown', async () => {
+    const main = await windowOf('main');
+    await main.keyboard.press('ControlOrMeta+n');
+    await main.keyboard.type('# Pasted\n\n');
+    await pasteData(main, {
+      'text/html': '<p>Ship <b>sync</b> first</p><table><tr><td>Who</td><td>What</td></tr><tr><td>Sam</td><td><i>server</i></td></tr></table>',
+      'text/plain': 'Ship sync first\nWho\tWhat\nSam\tserver',
+    });
+    await expect.poll(() => list().some((d) => d.title === 'Pasted')).toBe(true);
+    const id = list().find((d) => d.title === 'Pasted')!.id;
+    await expect
+      .poll(() => run('show', id))
+      .toBe('# Pasted\n\nShip **sync** first\n\n| Who | What |\n| --- | --- |\n| Sam | *server* |\n');
+
+    // Inside a code block, a paste stays as it was copied.
+    await main.keyboard.press('ControlOrMeta+End');
+    await main.keyboard.type('\n\n```\n');
+    await pasteData(main, { 'text/html': '<p><b>not</b> converted</p>', 'text/plain': 'not converted' });
+    await expect.poll(() => run('show', id)).toMatch(/```\nnot converted\n$/);
+
+    // Copy as Rich Text, pasted back in, is the markdown it came from.
+    const source = run('show', id).replace(/\n$/, '');
+    await main.keyboard.press('ControlOrMeta+a');
+    await main.keyboard.press('ControlOrMeta+Shift+C');
+    await expect(main.locator('#toast')).toHaveText('Copied as rich text');
+    const copied = await app.evaluate(async ({ clipboard }) => {
+      const [item] = await clipboard.read();
+      const read = (type: string) => (item.getType(type) as Promise<Blob>).then((b) => b.text());
+      return { html: await read('text/html'), text: await read('text/plain') };
+    });
+    expect(copied.html).toContain('<table>');
+    await main.keyboard.press('ControlOrMeta+n');
+    await pasteData(main, { 'text/html': copied.html, 'text/plain': copied.text });
+    await expect.poll(() => editorText(main)).toContain('Ship');
+    await expect.poll(() => list().filter((d) => d.title === 'Pasted').length).toBe(2);
+    const copy = list().find((d) => d.title === 'Pasted' && d.id !== id)!.id;
+    await expect.poll(() => run('show', copy).replace(/\n$/, '')).toBe(source);
+
+    // Through the real clipboard: Paste converts, and Paste and Match Style doesn't.
+    await main.keyboard.press('ControlOrMeta+n');
+    await main.keyboard.type('Real clipboard\n');
+    const pasteFromClipboard = (method: 'paste' | 'pasteAndMatchStyle') =>
+      app.evaluate(async ({ BrowserWindow, clipboard, ClipboardItem }, method) => {
+        await clipboard.write([new ClipboardItem({ 'text/html': '<p>a <b>bold</b> move</p>', 'text/plain': 'a bold move' })]);
+        const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('kind=main'))!;
+        win.webContents[method]();
+      }, method);
+    await pasteFromClipboard('paste');
+    await main.keyboard.press('Enter');
+    await pasteFromClipboard('pasteAndMatchStyle');
+    await expect.poll(() => list().some((d) => d.title === 'Real clipboard')).toBe(true);
+    const real = list().find((d) => d.title === 'Real clipboard')!.id;
+    await expect.poll(() => run('show', real)).toBe('Real clipboard\na **bold** move\na bold move\n');
   });
 });

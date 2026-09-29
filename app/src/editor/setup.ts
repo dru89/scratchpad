@@ -12,6 +12,7 @@ import { createFindPanel, openReplace, REPLACE_KEY } from './find';
 import { type ImageHost, imagePasting } from './images';
 import { indentKeys } from './indent';
 import { livePreview } from './livepreview';
+import { richPasting } from './richpaste';
 import { selectionLayer } from './selection';
 import { tables } from './tables';
 
@@ -76,6 +77,7 @@ export function editorExtensions(opts: {
     livePreview,
     tables,
     imagePasting(opts.images),
+    richPasting,
     EditorView.lineWrapping,
     placeholder(opts.placeholder),
     EditorView.updateListener.of(opts.onUpdate),

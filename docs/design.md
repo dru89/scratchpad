@@ -253,6 +253,24 @@ The daemon writes it ([`crates/core/src/export.rs`](../crates/core/src/export.rs
 
 "Copy as rich text" copies the selection, or the whole draft if nothing is selected. The app gets HTML from `drafts.render` and writes both `text/html` and the markdown as `text/plain` to the clipboard. Images go in the HTML as `data:` URLs, so they arrive in apps that accept pasted pictures.
 
+## Pasting
+
+Pasting formatted text writes markdown ([`editor/richpaste.ts`](../app/src/editor/richpaste.ts)). The clipboard's HTML is read for headings, bold, italics, strikethrough, links, inline and fenced code, quotes, rules, lists (nested, numbered and tasks) and tables, so a copy from Google Docs, Word, Slack, Confluence or a web page arrives as the markdown the editor already shows.
+
+- **Formatting comes from styles as well as tags.** Google Docs marks bold with `font-weight` and wraps a whole copy in `<b style="font-weight:normal">`, so a style wins over its tag. Word's lists are paragraphs with `mso-list` styles, and they come out as lists.
+- **Structure follows how the page renders.** Paragraphs are separated by a blank line and `<div>`s by a line break. A table with two columns or more becomes a markdown table with its first row as the header. A one-column table, or one holding other tables, is layout, as in an email, and becomes its text. Nested lists step in with a tab, like the editor's own.
+- **Only text that would read as markdown is escaped**, since every backslash shows: `*` and `_` where they could make emphasis, a line that would start a heading, list or quote, and so on. `5 * 3` and `snake_case` stay as they are.
+- **Remote images keep their link** as markdown; images embedded in the HTML are left out rather than buried in base64.
+
+The plain text is pasted instead when the HTML adds nothing, and whenever the formatting isn't the point:
+
+- the cursor is in code, fenced or inline;
+- everything copied is code, as a code editor or terminal copies it (monospace or preformatted), where the plain text is exactly what was selected;
+- the HTML is scratchpad's own Copy as Rich Text, whose plain text is the draft's markdown;
+- the converted text reads the same as the plain text, apart from escapes and spacing.
+
+Paste and Match Style (⌥⇧⌘V on macOS, Paste as Plain Text and Ctrl+Shift+V on Linux) always pastes the plain text.
+
 ## Not in v1
 
 Tags, folders, actions, saved searches, sort options other than last modified, sync, and the macOS and iOS apps. The design leaves room for each.
